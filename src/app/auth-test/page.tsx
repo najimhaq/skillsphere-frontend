@@ -1,6 +1,6 @@
 'use client';
 
-import { SubmitEvent, useState } from 'react';
+import { SubmitEvent, useEffect, useState } from 'react';
 
 import { authClient } from '@/lib/auth-client';
 
@@ -18,6 +18,7 @@ export default function AuthTestPage() {
   const [password, setPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<AuthMessage | null>(null);
+  const { data: session, isPending } = authClient.useSession();
 
   const handleSubmit = async (
     event: SubmitEvent<HTMLFormElement>
@@ -124,6 +125,19 @@ export default function AuthTestPage() {
           Better Auth cookie-session integration test
         </p>
 
+        <div className='mt-4 rounded-md bg-slate-100 p-3 text-sm text-slate-700'>
+          {isPending ? (
+            <p>Checking session...</p>
+          ) : session?.user ? (
+            <>
+              <p className='font-semibold'>Signed in as: {session.user.name}</p>
+              <p>{session.user.email}</p>
+            </>
+          ) : (
+            <p>No active session</p>
+          )}
+        </div>
+
         <div className='mt-6 flex gap-2'>
           <button
             type='button'
@@ -153,13 +167,13 @@ export default function AuthTestPage() {
         <form onSubmit={handleSubmit} className='mt-6 space-y-4'>
           {mode === 'signup' && (
             <label className='block'>
-              <span className='text-sm font-medium text-slate-700'>Name</span>
+              <span className='text-sm font-medium text-slate-700 '>Name</span>
               <input
                 type='text'
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 required
-                className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-900'
+                className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-900 focus:bg-blue-200 text-black'
               />
             </label>
           )}
@@ -171,7 +185,7 @@ export default function AuthTestPage() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
-              className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-900'
+              className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-900 focus:bg-blue-200 text-black'
             />
           </label>
 
@@ -183,7 +197,7 @@ export default function AuthTestPage() {
               onChange={(event) => setPassword(event.target.value)}
               minLength={8}
               required
-              className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-900'
+              className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-900 focus:bg-blue-200 text-black'
             />
           </label>
 
