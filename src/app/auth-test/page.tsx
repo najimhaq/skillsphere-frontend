@@ -20,6 +20,8 @@ export default function AuthTestPage() {
   const [message, setMessage] = useState<AuthMessage | null>(null);
   const { data: session, isPending } = authClient.useSession();
 
+  console.log(session)
+
   const handleSubmit = async (
     event: SubmitEvent<HTMLFormElement>
   ): Promise<void> => {

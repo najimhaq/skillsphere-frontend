@@ -4,10 +4,20 @@ import type { ReactNode } from 'react';
 import { Toaster } from 'react-hot-toast';
 
 import { Inter } from 'next/font/google';
+import { Metadata } from 'next';
+import { Navbar } from '@/components/layout/Navbar';
+import { SmoothScrollProvider } from '@/components/providers/smooth-scroll-provider';
+import { ScrollReset } from '@/components/ui/scroll-reset';
+import { ScrollProgress } from '@/components/ui/scroll-progress';
+import { BackToTop } from '@/components/ui/back-to-top';
 
-export const metadata = {
-  title: 'SkillSphere - Find Your Perfect course',
-  description: 'Discover and book amazing courses worldwide',
+export const metadata: Metadata = {
+  title: {
+    default: 'SkillSphere | Learn practical skills',
+    template: '%s | SkillSphere',
+  },
+  description:
+    'SkillSphere is a learning platform for practical courses, visible progress, and career-ready skills.',
 };
 
 const inter = Inter({
@@ -24,10 +34,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
       className={inter.className}
     >
-      <body className='flex min-h-screen flex-col  antialiased'>
-        <main className='grow'>
-          <div className='mx-auto max-w-full'>{children}</div>
-        </main>
+      <body className='flex min-h-screen flex-col antialiased'>
+        <SmoothScrollProvider>
+          <ScrollReset />
+          <ScrollProgress />
+
+          <Navbar />
+
+          <main className='grow'>
+            <div className='mx-auto max-w-full'>{children}</div>
+          </main>
+
+          <BackToTop />
+        </SmoothScrollProvider>
+
         <Toaster
           position='top-right'
           toastOptions={{
