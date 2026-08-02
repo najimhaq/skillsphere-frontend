@@ -1,9 +1,10 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
+  AlertCircle,
   ArrowLeft,
   ImageIcon,
   LoaderCircle,
@@ -11,7 +12,8 @@ import {
 } from 'lucide-react';
 
 import {
-  createInstructorCourse,
+  getMyInstructorCourseById,
+  updateInstructorCourse,
   type CourseLevel,
 } from '@/lib/instructor-course-api';
 
@@ -25,7 +27,7 @@ type FormState = {
   thumbnailUrl: string;
 };
 
-const initialForm: FormState = {
+const emptyForm: FormState = {
   title: '',
   shortDescription: '',
   description: '',
@@ -35,15 +37,63 @@ const initialForm: FormState = {
   thumbnailUrl: '',
 };
 
-export default function CreateCoursePage() {
-  const router = useRouter();
+type FieldErrors = Record<string, string[] | undefined>;
 
-  const [form, setForm] = useState<FormState>(initialForm);
+export default function EditCoursePage() {
+  const router = useRouter();
+  const params = useParams<{ courseId: string }>();
+
+  const courseId = Array.isArray(params.courseId)
+    ? params.courseId[0]
+    : params.courseId;
+
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<
-    Record<string, string[] | undefined>
-  >({});
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  useEffect(() => {
+    const loadCourse = async () => {
+      if (!courseId) {
+        setError('Invalid course identifier.');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError('');
+
+        const course = await getMyInstructorCourseById(courseId);
+
+        if (course.status !== 'DRAFT') {
+          setError('Only draft courses can be edited.');
+          return;
+        }
+
+        setForm({
+          title: course.title,
+          shortDescription: course.shortDescription,
+          description: course.description ?? '',
+          category: course.category,
+          level: course.level,
+          price: String(course.price),
+          thumbnailUrl: course.thumbnailUrl ?? '',
+        });
+      } catch (caughtError) {
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : 'Unable to load course details.'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadCourse();
+  }, [courseId]);
 
   const updateField = <K extends keyof FormState>(
     key: K,
@@ -65,12 +115,17 @@ export default function CreateCoursePage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setIsSubmitting(true);
-    setError('');
-    setFieldErrors({});
+    if (!courseId) {
+      setError('Invalid course identifier.');
+      return;
+    }
 
     try {
-      await createInstructorCourse({
+      setIsSubmitting(true);
+      setError('');
+      setFieldErrors({});
+
+      await updateInstructorCourse(courseId, {
         title: form.title.trim(),
         shortDescription: form.shortDescription.trim(),
         description: form.description.trim(),
@@ -84,10 +139,10 @@ export default function CreateCoursePage() {
       router.refresh();
     } catch (caughtError) {
       const typedError = caughtError as Error & {
-        fieldErrors?: Record<string, string[] | undefined>;
+        fieldErrors?: FieldErrors;
       };
 
-      setError(typedError.message);
+      setError(typedError.message ?? 'Unable to update course.');
       setFieldErrors(typedError.fieldErrors ?? {});
     } finally {
       setIsSubmitting(false);
@@ -95,6 +150,17 @@ export default function CreateCoursePage() {
   };
 
   const getFieldError = (field: string) => fieldErrors[field]?.[0];
+
+  if (isLoading) {
+    return (
+      <div className='grid min-h-80 place-items-center'>
+        <div className='flex items-center gap-2 text-sm font-medium text-slate-500'>
+          <LoaderCircle className='h-5 w-5 animate-spin' />
+          Loading course details...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='mx-auto max-w-4xl'>
@@ -108,29 +174,29 @@ export default function CreateCoursePage() {
         </Link>
 
         <h1 className='mt-5 text-3xl font-bold tracking-tight text-slate-900'>
-          Create a new course
+          Edit draft course
         </h1>
 
         <p className='mt-2 text-sm leading-6 text-slate-600'>
-          Add the course information below. Your course will be saved as a
-          draft, then you can submit it for admin review.
+          Update your draft before submitting it for admin review.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className='space-y-6'>
-        {error && (
-          <div className='rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700'>
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className='mb-6 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700'>
+          <AlertCircle className='mt-0.5 h-4 w-4 shrink-0' />
+          <p>{error}</p>
+        </div>
+      )}
 
+      <form onSubmit={handleSubmit} className='space-y-6'>
         <section className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>
           <div className='mb-6'>
             <h2 className='text-lg font-bold text-slate-900'>
               Basic information
             </h2>
             <p className='mt-1 text-sm text-slate-500'>
-              Use a clear title and concise summary for learners.
+              Use a clear title and a useful description for learners.
             </p>
           </div>
 
@@ -147,13 +213,8 @@ export default function CreateCoursePage() {
                 id='title'
                 value={form.title}
                 onChange={(event) => updateField('title', event.target.value)}
-                placeholder='e.g. Next.js Full-Stack Development'
-                className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
               />
-
-              <p className='mt-1.5 text-xs text-slate-500'>
-                5 to 120 characters
-              </p>
 
               {getFieldError('title') && (
                 <p className='mt-1 text-xs text-rose-600'>
@@ -172,18 +233,13 @@ export default function CreateCoursePage() {
 
               <textarea
                 id='shortDescription'
+                rows={3}
                 value={form.shortDescription}
                 onChange={(event) =>
                   updateField('shortDescription', event.target.value)
                 }
-                rows={3}
-                placeholder='Briefly describe what learners will gain from this course.'
-                className='mt-2 w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                className='mt-2 w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
               />
-
-              <p className='mt-1.5 text-xs text-slate-500'>
-                20 to 300 characters
-              </p>
 
               {getFieldError('shortDescription') && (
                 <p className='mt-1 text-xs text-rose-600'>
@@ -202,18 +258,13 @@ export default function CreateCoursePage() {
 
               <textarea
                 id='description'
+                rows={8}
                 value={form.description}
                 onChange={(event) =>
                   updateField('description', event.target.value)
                 }
-                rows={8}
-                placeholder='Explain the course content, skills learners will gain, and who this course is for.'
-                className='mt-2 w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                className='mt-2 w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
               />
-
-              <p className='mt-1.5 text-xs text-slate-500'>
-                Minimum 50 characters
-              </p>
 
               {getFieldError('description') && (
                 <p className='mt-1 text-xs text-rose-600'>
@@ -229,9 +280,6 @@ export default function CreateCoursePage() {
             <h2 className='text-lg font-bold text-slate-900'>
               Course settings
             </h2>
-            <p className='mt-1 text-sm text-slate-500'>
-              Choose a category, level, price, and optional course cover.
-            </p>
           </div>
 
           <div className='grid gap-5 sm:grid-cols-2'>
@@ -243,23 +291,14 @@ export default function CreateCoursePage() {
                 Category
               </label>
 
-              <select
+              <input
                 id='category'
                 value={form.category}
                 onChange={(event) =>
                   updateField('category', event.target.value)
                 }
-                className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
-              >
-                <option value='' disabled>
-                  Select a category
-                </option>
-                <option value='Web Development'>Web Development</option>
-                <option value='Programming'>Programming</option>
-                <option value='Design'>Design</option>
-                <option value='Tools'>Tools</option>
-                <option value='Business'>Business</option>
-              </select>
+                className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+              />
 
               {getFieldError('category') && (
                 <p className='mt-1 text-xs text-rose-600'>
@@ -314,10 +353,6 @@ export default function CreateCoursePage() {
                 className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
               />
 
-              <p className='mt-1.5 text-xs text-slate-500'>
-                Set 0 for a free course
-              </p>
-
               {getFieldError('price') && (
                 <p className='mt-1 text-xs text-rose-600'>
                   {getFieldError('price')}
@@ -343,8 +378,7 @@ export default function CreateCoursePage() {
                   onChange={(event) =>
                     updateField('thumbnailUrl', event.target.value)
                   }
-                  placeholder='https://example.com/course-cover.jpg'
-                  className='w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                  className='w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
                 />
               </div>
 
@@ -367,18 +401,18 @@ export default function CreateCoursePage() {
 
           <button
             type='submit'
-            disabled={isSubmitting}
+            disabled={isSubmitting || Boolean(error)}
             className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
           >
             {isSubmitting ? (
               <>
                 <LoaderCircle className='h-4 w-4 animate-spin' />
-                Saving draft...
+                Saving changes...
               </>
             ) : (
               <>
                 <Save className='h-4 w-4' />
-                Save as draft
+                Save changes
               </>
             )}
           </button>

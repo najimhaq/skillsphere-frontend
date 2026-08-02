@@ -54,10 +54,14 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           {menuItems.map((item) => {
             const Icon = item.icon;
 
-            const isActive =
-              pathname === item.href ||
-              (item.href !== `/dashboard/${role?.toLowerCase()}` &&
-                pathname.startsWith(`${item.href}/`));
+            const isCreateCourse = item.href.endsWith('/courses/create');
+
+            const isActive = isCreateCourse
+              ? pathname === item.href
+              : pathname === item.href ||
+                (item.href !== `/dashboard/${role?.toLowerCase()}` &&
+                  pathname.startsWith(`${item.href}/`) &&
+                  !pathname.endsWith('/create'));
 
             return (
               <Link
