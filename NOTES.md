@@ -12,3 +12,64 @@
 ✅ Duplicate enrollment protection
 ✅ My courses
 ✅ My enrollments (যোগ করার পর)
+
+
+src/
+├── app/
+│   ├── (public)/
+│   │   ├── page.tsx
+│   │   ├── courses/
+│   │   │   ├── page.tsx
+│   │   │   └── [courseId]/
+│   │   │       └── page.tsx
+│   │   ├── layout.tsx
+│   │   └── ...
+│   │
+│   ├── (auth)/
+│   │   ├── sign-in/
+│   │   │   └── page.tsx
+│   │   └── sign-up/
+│   │       └── page.tsx
+│   │
+│   ├── (dashboard)/
+│   │   ├── layout.tsx
+│   │   │
+│   │   └── dashboard/
+│   │       ├── page.tsx
+│   │       ├── student/
+│   │       │   ├── page.tsx
+│   │       │   ├── my-learning/
+│   │       │   │   └── page.tsx
+│   │       │   └── profile/
+│   │       │       └── page.tsx
+│   │       │
+│   │       ├── instructor/
+│   │       │   ├── page.tsx
+│   │       │   ├── courses/
+│   │       │   │   └── page.tsx
+│   │       │   ├── courses/
+│   │       │   │   └── create/
+│   │       │   │       └── page.tsx
+│   │       │   └── students/
+│   │       │       └── page.tsx
+│   │       │
+│   │       └── admin/
+│   │           ├── page.tsx
+│   │           ├── users/
+│   │           │   └── page.tsx
+│   │           ├── courses/
+│   │           │   └── page.tsx
+│   │           └── analytics/
+│   │               └── page.tsx
+│   │
+│   └── layout.tsx
+│
+├── components/
+│   └── dashboard/
+│       ├── DashboardShell.tsx
+│       ├── DashboardSidebar.tsx
+│       ├── DashboardHeader.tsx
+│       └── RoleGuard.tsx
+│
+└── config/
+    └── dashboard-menu.ts
