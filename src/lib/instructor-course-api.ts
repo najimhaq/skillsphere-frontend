@@ -1,11 +1,34 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
+export type CourseStatus =
+  | 'DRAFT'
+  | 'PENDING_REVIEW'
+  | 'PUBLISHED'
+  | 'REJECTED';
+
 export type CourseLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
 
 export type LessonType = 'VIDEO' | 'ARTICLE';
 
+export type InstructorCourse = {
+  _id: string;
+  title: string;
+  slug: string;
+  shortDescription: string;
+  description: string;
+  category: string;
+  level: CourseLevel;
+  price: number;
+  thumbnailUrl: string | null;
+  status: CourseStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CourseLesson = {
   _id: string;
+  courseId: string;
+  sectionId: string;
   title: string;
   type: LessonType;
   videoUrl: string | null;
@@ -13,13 +36,18 @@ export type CourseLesson = {
   durationMinutes: number;
   isPreview: boolean;
   order: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CourseSection = {
   _id: string;
+  courseId: string;
   title: string;
   order: number;
   lessons: CourseLesson[];
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type CourseContent = {
@@ -30,13 +58,24 @@ export type CourseContent = {
   };
   sections: CourseSection[];
 };
-export type CreateCoursePayload = {
+
+export type CreateInstructorCoursePayload = {
   title: string;
   shortDescription: string;
   description: string;
   category: string;
   level: CourseLevel;
   price: number;
+  thumbnailUrl?: string;
+};
+
+export type UpdateInstructorCoursePayload = {
+  title?: string;
+  shortDescription?: string;
+  description?: string;
+  category?: string;
+  level?: CourseLevel;
+  price?: number;
   thumbnailUrl?: string;
 };
 
@@ -58,12 +97,56 @@ export type CreateLessonPayload =
       order: number;
     };
 
-type ApiErrorResponse = {
-  message?: string;
-  errors?: Record<string, string[] | undefined>;
+export type UpdateLessonPayload =
+  | {
+      title: string;
+      type: 'VIDEO';
+      videoUrl: string;
+      durationMinutes: number;
+      isPreview: boolean;
+    }
+  | {
+      title: string;
+      type: 'ARTICLE';
+      content: string;
+      durationMinutes: number;
+      isPreview: boolean;
+    };
+
+export type UpdateSectionPayload = {
+  title: string;
 };
 
-export async function createInstructorCourse(payload: CreateCoursePayload) {
+export type ApiFieldErrors = Record<string, string[] | undefined>;
+
+type ApiErrorResponse = {
+  message?: string;
+  errors?: ApiFieldErrors;
+};
+
+type ApiError = Error & {
+  fieldErrors?: ApiFieldErrors;
+};
+
+async function getApiError(response: Response): Promise<ApiError> {
+  try {
+    const result = (await response.json()) as ApiErrorResponse;
+
+    const error = new Error(
+      result.message ?? 'Something went wrong'
+    ) as ApiError;
+
+    error.fieldErrors = result.errors;
+
+    return error;
+  } catch {
+    return new Error('Something went wrong') as ApiError;
+  }
+}
+
+export async function createInstructorCourse(
+  payload: CreateInstructorCoursePayload
+): Promise<InstructorCourse> {
   const response = await fetch(`${API_URL}/api/courses`, {
     method: 'POST',
     credentials: 'include',
@@ -73,66 +156,15 @@ export async function createInstructorCourse(payload: CreateCoursePayload) {
     body: JSON.stringify(payload),
   });
 
-  const result = (await response.json()) as {
-    success?: boolean;
-    message?: string;
-    data?: { _id: string };
-    errors?: Record<string, string[] | undefined>;
-  };
-
   if (!response.ok) {
-    const error = new Error(
-      result.message ?? 'Unable to create course'
-    ) as Error & {
-      fieldErrors?: Record<string, string[] | undefined>;
-    };
-
-    error.fieldErrors = result.errors;
-    throw error;
+    throw await getApiError(response);
   }
 
-  return result;
-}
+  const result = (await response.json()) as {
+    data: InstructorCourse;
+  };
 
-// Additional types and functions for managing instructor courses
-export type CourseStatus =
-  | 'DRAFT'
-  | 'PENDING_REVIEW'
-  | 'PUBLISHED'
-  | 'REJECTED';
-
-export type InstructorCourse = {
-  _id: string;
-  title: string;
-  slug: string;
-  shortDescription: string;
-  description: string;
-  category: string;
-  level: CourseLevel;
-  price: number;
-  thumbnailUrl: string | null;
-  status: CourseStatus;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type MyCoursesResponse = {
-  success: boolean;
-  data: InstructorCourse[];
-  message?: string;
-};
-
-type ApiMessageResponse = {
-  success: boolean;
-  message?: string;
-};
-
-async function getApiError(response: Response) {
-  const result = (await response.json().catch(() => null)) as {
-    message?: string;
-  } | null;
-
-  return result?.message ?? 'Something went wrong. Please try again.';
+  return result.data;
 }
 
 export async function getMyInstructorCourses(): Promise<InstructorCourse[]> {
@@ -143,40 +175,14 @@ export async function getMyInstructorCourses(): Promise<InstructorCourse[]> {
   });
 
   if (!response.ok) {
-    throw new Error(await getApiError(response));
+    throw await getApiError(response);
   }
 
-  const result = (await response.json()) as MyCoursesResponse;
+  const result = (await response.json()) as {
+    data: InstructorCourse[];
+  };
+
   return result.data;
-}
-
-export async function submitCourseForReview(courseId: string) {
-  const response = await fetch(
-    `${API_URL}/api/courses/${courseId}/submit-review`,
-    {
-      method: 'POST',
-      credentials: 'include',
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(await getApiError(response));
-  }
-
-  return (await response.json()) as ApiMessageResponse;
-}
-
-export async function deleteInstructorCourse(courseId: string) {
-  const response = await fetch(`${API_URL}/api/courses/${courseId}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(await getApiError(response));
-  }
-
-  return (await response.json()) as ApiMessageResponse;
 }
 
 export async function getMyInstructorCourseById(
@@ -192,11 +198,10 @@ export async function getMyInstructorCourseById(
   );
 
   if (!response.ok) {
-    throw new Error(await getApiError(response));
+    throw await getApiError(response);
   }
 
   const result = (await response.json()) as {
-    success: boolean;
     data: InstructorCourse;
   };
 
@@ -205,8 +210,8 @@ export async function getMyInstructorCourseById(
 
 export async function updateInstructorCourse(
   courseId: string,
-  payload: CreateCoursePayload
-) {
+  payload: UpdateInstructorCoursePayload
+): Promise<InstructorCourse> {
   const response = await fetch(`${API_URL}/api/courses/${courseId}`, {
     method: 'PATCH',
     credentials: 'include',
@@ -216,24 +221,15 @@ export async function updateInstructorCourse(
     body: JSON.stringify(payload),
   });
 
-  const result = (await response.json()) as {
-    success?: boolean;
-    message?: string;
-    errors?: Record<string, string[] | undefined>;
-  };
-
   if (!response.ok) {
-    const error = new Error(
-      result.message ?? 'Unable to update course'
-    ) as Error & {
-      fieldErrors?: Record<string, string[] | undefined>;
-    };
-
-    error.fieldErrors = result.errors;
-    throw error;
+    throw await getApiError(response);
   }
 
-  return result;
+  const result = (await response.json()) as {
+    data: InstructorCourse;
+  };
+
+  return result.data;
 }
 
 export async function getInstructorCourseContent(
@@ -246,11 +242,10 @@ export async function getInstructorCourseContent(
   });
 
   if (!response.ok) {
-    throw new Error(await getApiError(response));
+    throw await getApiError(response);
   }
 
   const result = (await response.json()) as {
-    success: boolean;
     data: CourseContent;
   };
 
@@ -273,20 +268,53 @@ export async function createInstructorCourseSection(
     body: JSON.stringify(payload),
   });
 
-  const result = (await response.json()) as {
-    success?: boolean;
-    message?: string;
-    data?: CourseSection;
-  };
-
   if (!response.ok) {
-    throw new Error(result.message ?? 'Unable to create section');
+    throw await getApiError(response);
   }
 
-  return result.data as CourseSection;
+  const result = (await response.json()) as {
+    data: CourseSection;
+  };
+
+  return result.data;
 }
 
+export async function updateInstructorSection(
+  sectionId: string,
+  payload: UpdateSectionPayload
+): Promise<CourseSection> {
+  const response = await fetch(`${API_URL}/api/sections/${sectionId}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
 
+  if (!response.ok) {
+    throw await getApiError(response);
+  }
+
+  const result = (await response.json()) as {
+    data: CourseSection;
+  };
+
+  return result.data;
+}
+
+export async function deleteInstructorSection(
+  sectionId: string
+): Promise<void> {
+  const response = await fetch(`${API_URL}/api/sections/${sectionId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw await getApiError(response);
+  }
+}
 
 export async function createInstructorLesson(
   sectionId: string,
@@ -304,15 +332,73 @@ export async function createInstructorLesson(
     }
   );
 
-  const result = (await response.json()) as {
-    success?: boolean;
-    message?: string;
-    data?: CourseLesson;
-  };
-
   if (!response.ok) {
-    throw new Error(result.message ?? 'Unable to create lesson');
+    throw await getApiError(response);
   }
 
-  return result.data as CourseLesson;
+  const result = (await response.json()) as {
+    data: CourseLesson;
+  };
+
+  return result.data;
+}
+
+export async function updateInstructorLesson(
+  lessonId: string,
+  payload: UpdateLessonPayload
+): Promise<CourseLesson> {
+  const response = await fetch(`${API_URL}/api/lessons/${lessonId}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw await getApiError(response);
+  }
+
+  const result = (await response.json()) as {
+    data: CourseLesson;
+  };
+
+  return result.data;
+}
+
+export async function deleteInstructorLesson(lessonId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/lessons/${lessonId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw await getApiError(response);
+  }
+}
+
+export async function submitCourseForReview(courseId: string): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/api/courses/${courseId}/submit-review`,
+    {
+      method: 'POST',
+      credentials: 'include',
+    }
+  );
+
+  if (!response.ok) {
+    throw await getApiError(response);
+  }
+}
+
+export async function deleteInstructorCourse(courseId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/courses/${courseId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw await getApiError(response);
+  }
 }

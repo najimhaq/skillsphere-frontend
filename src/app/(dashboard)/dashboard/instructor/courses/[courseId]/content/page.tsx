@@ -1,4 +1,3 @@
-// src/app/(dashboard)/dashboard/instructor/courses/[courseId]/content/page.tsx
 'use client';
 
 import { useEffect, useState, type SubmitEvent } from 'react';
@@ -15,16 +14,43 @@ import {
   Film,
   GripVertical,
   LoaderCircle,
+  Pencil,
   Plus,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 import {
   createInstructorCourseSection,
   createInstructorLesson,
+  deleteInstructorLesson,
+  deleteInstructorSection,
   getInstructorCourseContent,
+  updateInstructorLesson,
+  updateInstructorSection,
   type CourseContent,
+  type CourseLesson,
+  type CourseSection,
   type LessonType,
 } from '@/lib/instructor-course-api';
+
+type LessonFormState = {
+  title: string;
+  type: LessonType;
+  videoUrl: string;
+  content: string;
+  durationMinutes: string;
+  isPreview: boolean;
+};
+
+const initialLessonForm: LessonFormState = {
+  title: '',
+  type: 'VIDEO',
+  videoUrl: '',
+  content: '',
+  durationMinutes: '0',
+  isPreview: false,
+};
 
 export default function CourseContentPage() {
   const params = useParams<{ courseId: string }>();
@@ -37,17 +63,22 @@ export default function CourseContentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingSection, setIsCreatingSection] = useState(false);
   const [sectionTitle, setSectionTitle] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingSection, setIsSubmittingSection] = useState(false);
   const [error, setError] = useState('');
 
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
-  const [lessonTitle, setLessonTitle] = useState('');
-  const [lessonType, setLessonType] = useState<LessonType>('VIDEO');
-  const [videoUrl, setVideoUrl] = useState('');
-  const [articleContent, setArticleContent] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState('0');
-  const [isPreview, setIsPreview] = useState(false);
-  const [isCreatingLesson, setIsCreatingLesson] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<CourseLesson | null>(null);
+  const [lessonForm, setLessonForm] =
+    useState<LessonFormState>(initialLessonForm);
+  const [isSavingLesson, setIsSavingLesson] = useState(false);
+  const [actionLessonId, setActionLessonId] = useState<string | null>(null);
+
+  const [editingSection, setEditingSection] = useState<CourseSection | null>(
+    null
+  );
+  const [editingSectionTitle, setEditingSectionTitle] = useState('');
+  const [isSavingSection, setIsSavingSection] = useState(false);
+  const [actionSectionId, setActionSectionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseId) {
@@ -91,14 +122,44 @@ export default function CourseContentPage() {
     };
   }, [courseId]);
 
-  const resetLessonForm = () => {
+  const resetLessonModal = () => {
+    if (isSavingLesson) return;
+
     setActiveSectionId(null);
-    setLessonTitle('');
-    setLessonType('VIDEO');
-    setVideoUrl('');
-    setArticleContent('');
-    setDurationMinutes('0');
-    setIsPreview(false);
+    setEditingLesson(null);
+    setLessonForm(initialLessonForm);
+  };
+
+  const openCreateLessonModal = (sectionId: string) => {
+    setError('');
+    setEditingLesson(null);
+    setLessonForm(initialLessonForm);
+    setActiveSectionId(sectionId);
+  };
+
+  const openEditLessonModal = (lesson: CourseLesson) => {
+    setError('');
+    setActiveSectionId(lesson.sectionId);
+    setEditingLesson(lesson);
+
+    setLessonForm({
+      title: lesson.title,
+      type: lesson.type,
+      videoUrl: lesson.videoUrl ?? '',
+      content: lesson.content ?? '',
+      durationMinutes: String(lesson.durationMinutes),
+      isPreview: lesson.isPreview,
+    });
+  };
+
+  const updateLessonForm = <Key extends keyof LessonFormState>(
+    key: Key,
+    value: LessonFormState[Key]
+  ) => {
+    setLessonForm((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
   };
 
   const handleCreateSection = async (event: SubmitEvent<HTMLFormElement>) => {
@@ -107,7 +168,7 @@ export default function CourseContentPage() {
     if (!courseId || !sectionTitle.trim()) return;
 
     try {
-      setIsSubmitting(true);
+      setIsSubmittingSection(true);
       setError('');
 
       const newSection = await createInstructorCourseSection(courseId, {
@@ -139,34 +200,37 @@ export default function CourseContentPage() {
           : 'Unable to create section.'
       );
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingSection(false);
     }
   };
 
-  const handleCreateLesson = async (event: SubmitEvent<HTMLFormElement>) => {
+  const handleSaveLesson = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!activeSectionId || !content) return;
+    if (!content || !activeSectionId) return;
 
-    const title = lessonTitle.trim();
-    const parsedDuration = Number(durationMinutes);
+    const title = lessonForm.title.trim();
+    const durationMinutes = Number(lessonForm.durationMinutes);
 
     if (!title) {
       setError('Lesson title is required.');
       return;
     }
 
-    if (!Number.isInteger(parsedDuration) || parsedDuration < 0) {
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 0) {
       setError('Duration must be a whole number greater than or equal to 0.');
       return;
     }
 
-    if (lessonType === 'VIDEO' && !videoUrl.trim()) {
+    if (lessonForm.type === 'VIDEO' && !lessonForm.videoUrl.trim()) {
       setError('Video URL is required for a video lesson.');
       return;
     }
 
-    if (lessonType === 'ARTICLE' && articleContent.trim().length < 20) {
+    if (
+      lessonForm.type === 'ARTICLE' &&
+      lessonForm.content.trim().length < 20
+    ) {
       setError('Article content must contain at least 20 characters.');
       return;
     }
@@ -181,30 +245,169 @@ export default function CourseContentPage() {
     }
 
     try {
-      setIsCreatingLesson(true);
+      setIsSavingLesson(true);
       setError('');
 
       const basePayload = {
         title,
-        durationMinutes: parsedDuration,
-        isPreview,
-        order: selectedSection.lessons.length + 1,
+        durationMinutes,
+        isPreview: lessonForm.isPreview,
       };
 
       const payload =
-        lessonType === 'VIDEO'
+        lessonForm.type === 'VIDEO'
           ? {
               ...basePayload,
               type: 'VIDEO' as const,
-              videoUrl: videoUrl.trim(),
+              videoUrl: lessonForm.videoUrl.trim(),
             }
           : {
               ...basePayload,
               type: 'ARTICLE' as const,
-              content: articleContent.trim(),
+              content: lessonForm.content.trim(),
             };
 
-      const newLesson = await createInstructorLesson(activeSectionId, payload);
+      if (editingLesson) {
+        const updatedLesson = await updateInstructorLesson(
+          editingLesson._id,
+          payload
+        );
+
+        setContent((previous) => {
+          if (!previous) return previous;
+
+          return {
+            ...previous,
+            sections: previous.sections.map((section) => ({
+              ...section,
+              lessons: section.lessons.map((lesson) =>
+                lesson._id === updatedLesson._id ? updatedLesson : lesson
+              ),
+            })),
+          };
+        });
+      } else {
+        const createPayload = {
+          ...payload,
+          order: selectedSection.lessons.length + 1,
+        };
+
+        const newLesson = await createInstructorLesson(
+          activeSectionId,
+          createPayload
+        );
+
+        setContent((previous) => {
+          if (!previous) return previous;
+
+          return {
+            ...previous,
+            sections: previous.sections.map((section) =>
+              section._id === activeSectionId
+                ? {
+                    ...section,
+                    lessons: [...section.lessons, newLesson],
+                  }
+                : section
+            ),
+          };
+        });
+      }
+
+      resetLessonModal();
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : editingLesson
+            ? 'Unable to update lesson.'
+            : 'Unable to create lesson.'
+      );
+    } finally {
+      setIsSavingLesson(false);
+    }
+  };
+
+  const handleDeleteLesson = async (lesson: CourseLesson) => {
+    const confirmed = window.confirm(
+      `Delete "${lesson.title}"? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setActionLessonId(lesson._id);
+      setError('');
+
+      await deleteInstructorLesson(lesson._id);
+
+      setContent((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          sections: previous.sections.map((section) => {
+            if (section._id !== lesson.sectionId) {
+              return section;
+            }
+
+            const remainingLessons = section.lessons
+              .filter((item) => item._id !== lesson._id)
+              .map((item, index) => ({
+                ...item,
+                order: index + 1,
+              }));
+
+            return {
+              ...section,
+              lessons: remainingLessons,
+            };
+          }),
+        };
+      });
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to delete lesson.'
+      );
+    } finally {
+      setActionLessonId(null);
+    }
+  };
+
+  const openEditSectionModal = (section: CourseSection) => {
+    setError('');
+    setEditingSection(section);
+    setEditingSectionTitle(section.title);
+  };
+
+  const closeEditSectionModal = () => {
+    if (isSavingSection) return;
+
+    setEditingSection(null);
+    setEditingSectionTitle('');
+  };
+
+  const handleUpdateSection = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!editingSection) return;
+
+    const title = editingSectionTitle.trim();
+
+    if (title.length < 2) {
+      setError('Section title must be at least 2 characters.');
+      return;
+    }
+
+    try {
+      setIsSavingSection(true);
+      setError('');
+
+      const updatedSection = await updateInstructorSection(editingSection._id, {
+        title,
+      });
 
       setContent((previous) => {
         if (!previous) return previous;
@@ -212,25 +415,67 @@ export default function CourseContentPage() {
         return {
           ...previous,
           sections: previous.sections.map((section) =>
-            section._id === activeSectionId
+            section._id === updatedSection._id
               ? {
                   ...section,
-                  lessons: [...section.lessons, newLesson],
+                  ...updatedSection,
+                  lessons: section.lessons,
                 }
               : section
           ),
         };
       });
 
-      resetLessonForm();
+      closeEditSectionModal();
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : 'Unable to create lesson.'
+          : 'Unable to update section.'
       );
     } finally {
-      setIsCreatingLesson(false);
+      setIsSavingSection(false);
+    }
+  };
+
+  const handleDeleteSection = async (section: CourseSection) => {
+    const confirmed = window.confirm(
+      `Delete "${section.title}" and all ${section.lessons.length} lesson${
+        section.lessons.length === 1 ? '' : 's'
+      }? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setActionSectionId(section._id);
+      setError('');
+
+      await deleteInstructorSection(section._id);
+
+      setContent((previous) => {
+        if (!previous) return previous;
+
+        const remainingSections = previous.sections
+          .filter((item) => item._id !== section._id)
+          .map((item, index) => ({
+            ...item,
+            order: index + 1,
+          }));
+
+        return {
+          ...previous,
+          sections: remainingSections,
+        };
+      });
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to delete section.'
+      );
+    } finally {
+      setActionSectionId(null);
     }
   };
 
@@ -315,10 +560,10 @@ export default function CourseContentPage() {
 
                   <button
                     type='submit'
-                    disabled={isSubmitting || !sectionTitle.trim()}
+                    disabled={isSubmittingSection || !sectionTitle.trim()}
                     className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
                   >
-                    {isSubmitting ? (
+                    {isSubmittingSection ? (
                       <LoaderCircle className='h-4 w-4 animate-spin' />
                     ) : (
                       <Plus className='h-4 w-4' />
@@ -379,16 +624,45 @@ export default function CourseContentPage() {
                         </p>
                       </div>
 
-                      <button
-                        type='button'
-                        onClick={() => setActiveSectionId(section._id)}
-                        className='inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
-                      >
-                        <Plus className='h-4 w-4' />
-                        Add lesson
-                      </button>
+                      <div className='flex shrink-0 items-center gap-2'>
+                        <button
+                          type='button'
+                          disabled={actionSectionId === section._id}
+                          onClick={() => openEditSectionModal(section)}
+                          className='grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+                          title='Edit section'
+                          aria-label={`Edit ${section.title}`}
+                        >
+                          <Pencil className='h-4 w-4' />
+                        </button>
 
-                      <ChevronDown className='h-5 w-5 text-slate-400' />
+                        <button
+                          type='button'
+                          disabled={actionSectionId === section._id}
+                          onClick={() => handleDeleteSection(section)}
+                          className='grid h-9 w-9 place-items-center rounded-lg border border-rose-200 text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50'
+                          title='Delete section'
+                          aria-label={`Delete ${section.title}`}
+                        >
+                          {actionSectionId === section._id ? (
+                            <LoaderCircle className='h-4 w-4 animate-spin' />
+                          ) : (
+                            <Trash2 className='h-4 w-4' />
+                          )}
+                        </button>
+
+                        <button
+                          type='button'
+                          disabled={actionSectionId === section._id}
+                          onClick={() => openCreateLessonModal(section._id)}
+                          className='inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+                        >
+                          <Plus className='h-4 w-4' />
+                          Add lesson
+                        </button>
+
+                        <ChevronDown className='h-5 w-5 text-slate-400' />
+                      </div>
                     </div>
 
                     <div className='divide-y divide-slate-100'>
@@ -397,37 +671,71 @@ export default function CourseContentPage() {
                           No lessons in this section yet.
                         </div>
                       ) : (
-                        section.lessons.map((lesson) => (
-                          <div
-                            key={lesson._id}
-                            className='flex items-center gap-3 px-5 py-4'
-                          >
-                            <GripVertical className='h-4 w-4 text-slate-300' />
+                        section.lessons.map((lesson) => {
+                          const isBusy = actionLessonId === lesson._id;
 
-                            <div className='grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-600'>
-                              {lesson.type === 'VIDEO' ? (
-                                <Film className='h-4 w-4' />
-                              ) : (
-                                <FileText className='h-4 w-4' />
-                              )}
+                          return (
+                            <div
+                              key={lesson._id}
+                              className='flex items-center gap-3 px-5 py-4'
+                            >
+                              <GripVertical className='h-4 w-4 shrink-0 text-slate-300' />
+
+                              <div className='grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600'>
+                                {lesson.type === 'VIDEO' ? (
+                                  <Film className='h-4 w-4' />
+                                ) : (
+                                  <FileText className='h-4 w-4' />
+                                )}
+                              </div>
+
+                              <div className='min-w-0 flex-1'>
+                                <p className='truncate text-sm font-semibold text-slate-800'>
+                                  {lesson.order}. {lesson.title}
+                                </p>
+
+                                <p className='mt-0.5 text-xs text-slate-500'>
+                                  {lesson.type === 'VIDEO'
+                                    ? 'Video'
+                                    : 'Article'}
+                                  {' · '}
+                                  {lesson.durationMinutes} min
+                                  {lesson.isPreview ? ' · Free preview' : ''}
+                                </p>
+                              </div>
+
+                              <div className='flex shrink-0 items-center gap-2'>
+                                <button
+                                  type='button'
+                                  disabled={isBusy}
+                                  onClick={() => openEditLessonModal(lesson)}
+                                  className='grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+                                  title='Edit lesson'
+                                  aria-label={`Edit ${lesson.title}`}
+                                >
+                                  <Pencil className='h-4 w-4' />
+                                </button>
+
+                                <button
+                                  type='button'
+                                  disabled={isBusy}
+                                  onClick={() => handleDeleteLesson(lesson)}
+                                  className='grid h-9 w-9 place-items-center rounded-lg border border-rose-200 text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50'
+                                  title='Delete lesson'
+                                  aria-label={`Delete ${lesson.title}`}
+                                >
+                                  {isBusy ? (
+                                    <LoaderCircle className='h-4 w-4 animate-spin' />
+                                  ) : (
+                                    <Trash2 className='h-4 w-4' />
+                                  )}
+                                </button>
+
+                                <ChevronRight className='h-4 w-4 text-slate-400' />
+                              </div>
                             </div>
-
-                            <div className='min-w-0 flex-1'>
-                              <p className='truncate text-sm font-semibold text-slate-800'>
-                                {lesson.order}. {lesson.title}
-                              </p>
-
-                              <p className='mt-0.5 text-xs text-slate-500'>
-                                {lesson.type === 'VIDEO' ? 'Video' : 'Article'}
-                                {' · '}
-                                {lesson.durationMinutes} min
-                                {lesson.isPreview ? ' · Free preview' : ''}
-                              </p>
-                            </div>
-
-                            <ChevronRight className='h-4 w-4 text-slate-400' />
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </article>
@@ -438,38 +746,124 @@ export default function CourseContentPage() {
         )}
       </div>
 
-      {activeSectionId && (
+      {editingSection && (
         <div
           className='fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4'
           role='dialog'
           aria-modal='true'
-          aria-labelledby='add-lesson-title'
+          aria-labelledby='section-modal-title'
         >
           <form
-            onSubmit={handleCreateLesson}
-            className='max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl'
+            onSubmit={handleUpdateSection}
+            className='w-full max-w-md rounded-2xl bg-white shadow-2xl'
           >
             <div className='flex items-center justify-between border-b border-slate-200 px-6 py-5'>
               <div>
                 <h2
-                  id='add-lesson-title'
+                  id='section-modal-title'
                   className='text-xl font-bold text-slate-900'
                 >
-                  Add lesson
+                  Edit section
                 </h2>
 
                 <p className='mt-1 text-sm text-slate-500'>
-                  Choose the lesson type and add its content.
+                  Update this section title.
                 </p>
               </div>
 
               <button
                 type='button'
-                onClick={resetLessonForm}
-                disabled={isCreatingLesson}
-                className='rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50'
+                onClick={closeEditSectionModal}
+                disabled={isSavingSection}
+                aria-label='Close section form'
+                className='grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50'
               >
-                Close
+                <X className='h-5 w-5' />
+              </button>
+            </div>
+
+            <div className='p-6'>
+              <label
+                htmlFor='editSectionTitle'
+                className='text-sm font-semibold text-slate-800'
+              >
+                Section title
+              </label>
+
+              <input
+                id='editSectionTitle'
+                autoFocus
+                required
+                minLength={2}
+                maxLength={120}
+                value={editingSectionTitle}
+                onChange={(event) => setEditingSectionTitle(event.target.value)}
+                className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+              />
+            </div>
+
+            <div className='flex flex-col-reverse gap-3 border-t border-slate-200 px-6 py-5 sm:flex-row sm:justify-end'>
+              <button
+                type='button'
+                onClick={closeEditSectionModal}
+                disabled={isSavingSection}
+                className='rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+              >
+                Cancel
+              </button>
+
+              <button
+                type='submit'
+                disabled={
+                  isSavingSection || editingSectionTitle.trim().length < 2
+                }
+                className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
+              >
+                {isSavingSection && (
+                  <LoaderCircle className='h-4 w-4 animate-spin' />
+                )}
+                Save changes
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {activeSectionId && (
+        <div
+          className='fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4'
+          role='dialog'
+          aria-modal='true'
+          aria-labelledby='lesson-modal-title'
+        >
+          <form
+            onSubmit={handleSaveLesson}
+            className='max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl'
+          >
+            <div className='flex items-center justify-between border-b border-slate-200 px-6 py-5'>
+              <div>
+                <h2
+                  id='lesson-modal-title'
+                  className='text-xl font-bold text-slate-900'
+                >
+                  {editingLesson ? 'Edit lesson' : 'Add lesson'}
+                </h2>
+
+                <p className='mt-1 text-sm text-slate-500'>
+                  {editingLesson
+                    ? 'Update the lesson details below.'
+                    : 'Choose the lesson type and add its content.'}
+                </p>
+              </div>
+
+              <button
+                type='button'
+                onClick={resetLessonModal}
+                disabled={isSavingLesson}
+                aria-label='Close lesson form'
+                className='grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50'
+              >
+                <X className='h-5 w-5' />
               </button>
             </div>
 
@@ -486,8 +880,10 @@ export default function CourseContentPage() {
                   id='lessonTitle'
                   autoFocus
                   required
-                  value={lessonTitle}
-                  onChange={(event) => setLessonTitle(event.target.value)}
+                  value={lessonForm.title}
+                  onChange={(event) =>
+                    updateLessonForm('title', event.target.value)
+                  }
                   placeholder='e.g. Welcome to the course'
                   className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
                 />
@@ -503,10 +899,15 @@ export default function CourseContentPage() {
 
                 <select
                   id='lessonType'
-                  value={lessonType}
-                  onChange={(event) =>
-                    setLessonType(event.target.value as LessonType)
-                  }
+                  value={lessonForm.type}
+                  onChange={(event) => {
+                    const nextType = event.target.value as LessonType;
+
+                    setLessonForm((previous) => ({
+                      ...previous,
+                      type: nextType,
+                    }));
+                  }}
                   className='mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
                 >
                   <option value='VIDEO'>Video lesson</option>
@@ -514,7 +915,7 @@ export default function CourseContentPage() {
                 </select>
               </div>
 
-              {lessonType === 'VIDEO' ? (
+              {lessonForm.type === 'VIDEO' ? (
                 <div>
                   <label
                     htmlFor='videoUrl'
@@ -527,8 +928,10 @@ export default function CourseContentPage() {
                     id='videoUrl'
                     type='url'
                     required
-                    value={videoUrl}
-                    onChange={(event) => setVideoUrl(event.target.value)}
+                    value={lessonForm.videoUrl}
+                    onChange={(event) =>
+                      updateLessonForm('videoUrl', event.target.value)
+                    }
                     placeholder='https://youtube.com/...'
                     className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
                   />
@@ -546,11 +949,13 @@ export default function CourseContentPage() {
                     id='articleContent'
                     required
                     minLength={20}
-                    rows={7}
-                    value={articleContent}
-                    onChange={(event) => setArticleContent(event.target.value)}
+                    rows={8}
+                    value={lessonForm.content}
+                    onChange={(event) =>
+                      updateLessonForm('content', event.target.value)
+                    }
                     placeholder='Write your lesson content here...'
-                    className='mt-2 w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                    className='mt-2 w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
                   />
 
                   <p className='mt-2 text-xs text-slate-500'>
@@ -573,8 +978,10 @@ export default function CourseContentPage() {
                     type='number'
                     min='0'
                     step='1'
-                    value={durationMinutes}
-                    onChange={(event) => setDurationMinutes(event.target.value)}
+                    value={lessonForm.durationMinutes}
+                    onChange={(event) =>
+                      updateLessonForm('durationMinutes', event.target.value)
+                    }
                     className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
                   />
                 </div>
@@ -582,8 +989,10 @@ export default function CourseContentPage() {
                 <label className='flex cursor-pointer items-center gap-3 pt-7 text-sm font-semibold text-slate-800'>
                   <input
                     type='checkbox'
-                    checked={isPreview}
-                    onChange={(event) => setIsPreview(event.target.checked)}
+                    checked={lessonForm.isPreview}
+                    onChange={(event) =>
+                      updateLessonForm('isPreview', event.target.checked)
+                    }
                     className='h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500'
                   />
                   Free preview
@@ -594,8 +1003,8 @@ export default function CourseContentPage() {
             <div className='flex flex-col-reverse gap-3 border-t border-slate-200 px-6 py-5 sm:flex-row sm:justify-end'>
               <button
                 type='button'
-                onClick={resetLessonForm}
-                disabled={isCreatingLesson}
+                onClick={resetLessonModal}
+                disabled={isSavingLesson}
                 className='rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
               >
                 Cancel
@@ -603,13 +1012,13 @@ export default function CourseContentPage() {
 
               <button
                 type='submit'
-                disabled={isCreatingLesson}
+                disabled={isSavingLesson}
                 className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
               >
-                {isCreatingLesson && (
+                {isSavingLesson && (
                   <LoaderCircle className='h-4 w-4 animate-spin' />
                 )}
-                Create lesson
+                {editingLesson ? 'Save changes' : 'Create lesson'}
               </button>
             </div>
           </form>

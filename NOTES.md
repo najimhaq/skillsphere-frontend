@@ -73,3 +73,12 @@ src/
 │
 └── config/
     └── dashboard-menu.ts
+
+
+Student browse course
+→ Course details দেখে
+→ Enroll করে
+→ My Learning-এ course দেখে
+→ Lesson open করে
+→ Video / article পড়ে
+→ Progress track করে
