@@ -254,25 +254,40 @@ export default function InstructorCoursesPage() {
                       {course.price === 0 ? 'Free' : `$${course.price}`}
                     </span>
                   </div>
-
-                  <div className='mt-5 flex gap-2'>
+                  {/* all actions go here */}
+                  <div className='mt-5 flex flex-wrap gap-2'>
                     {course.status === 'PUBLISHED' ? (
                       <Link
                         href={`/courses/${course.slug}`}
-                        className='inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                        className='inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
                       >
-                        <Eye className='h-4 w-4' />
+                        <Eye className='h-4 w-4 shrink-0' />
                         View course
                       </Link>
                     ) : (
                       <Link
                         href={`/dashboard/instructor/courses/${course._id}/edit`}
-                        className='inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                        className='inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                        title={
+                          course.status === 'DRAFT'
+                            ? 'Edit draft'
+                            : 'View details'
+                        }
                       >
-                        <Clock3 className='h-4 w-4' />
+                        <Clock3 className='h-4 w-4 shrink-0' />
                         {course.status === 'DRAFT'
                           ? 'Edit draft'
                           : 'View details'}
+                      </Link>
+                    )}
+
+                    {course.status === 'DRAFT' && (
+                      <Link
+                        href={`/dashboard/instructor/courses/${course._id}/content`}
+                        className='inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100'
+                        title='Content'
+                      >
+                        <BookOpen className='h-4 w-4 shrink-0' />
                       </Link>
                     )}
 
@@ -281,7 +296,7 @@ export default function InstructorCoursesPage() {
                         type='button'
                         disabled={isBusy}
                         onClick={() => handleSubmitForReview(course._id)}
-                        className='inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
+                        className='inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
                         title='Submit for review'
                       >
                         {isBusy ? (

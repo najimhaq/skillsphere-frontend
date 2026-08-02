@@ -2,6 +2,34 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 export type CourseLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
 
+export type LessonType = 'VIDEO' | 'ARTICLE';
+
+export type CourseLesson = {
+  _id: string;
+  title: string;
+  type: LessonType;
+  videoUrl: string | null;
+  content: string | null;
+  durationMinutes: number;
+  isPreview: boolean;
+  order: number;
+};
+
+export type CourseSection = {
+  _id: string;
+  title: string;
+  order: number;
+  lessons: CourseLesson[];
+};
+
+export type CourseContent = {
+  course: {
+    _id: string;
+    title: string;
+    status: CourseStatus;
+  };
+  sections: CourseSection[];
+};
 export type CreateCoursePayload = {
   title: string;
   shortDescription: string;
@@ -11,6 +39,24 @@ export type CreateCoursePayload = {
   price: number;
   thumbnailUrl?: string;
 };
+
+export type CreateLessonPayload =
+  | {
+      title: string;
+      type: 'VIDEO';
+      videoUrl: string;
+      durationMinutes: number;
+      isPreview: boolean;
+      order: number;
+    }
+  | {
+      title: string;
+      type: 'ARTICLE';
+      content: string;
+      durationMinutes: number;
+      isPreview: boolean;
+      order: number;
+    };
 
 type ApiErrorResponse = {
   message?: string;
@@ -188,4 +234,85 @@ export async function updateInstructorCourse(
   }
 
   return result;
+}
+
+export async function getInstructorCourseContent(
+  courseId: string
+): Promise<CourseContent> {
+  const response = await fetch(`${API_URL}/api/courses/${courseId}/content`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiError(response));
+  }
+
+  const result = (await response.json()) as {
+    success: boolean;
+    data: CourseContent;
+  };
+
+  return result.data;
+}
+
+export async function createInstructorCourseSection(
+  courseId: string,
+  payload: {
+    title: string;
+    order: number;
+  }
+): Promise<CourseSection> {
+  const response = await fetch(`${API_URL}/api/courses/${courseId}/sections`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const result = (await response.json()) as {
+    success?: boolean;
+    message?: string;
+    data?: CourseSection;
+  };
+
+  if (!response.ok) {
+    throw new Error(result.message ?? 'Unable to create section');
+  }
+
+  return result.data as CourseSection;
+}
+
+
+
+export async function createInstructorLesson(
+  sectionId: string,
+  payload: CreateLessonPayload
+): Promise<CourseLesson> {
+  const response = await fetch(
+    `${API_URL}/api/courses/sections/${sectionId}/lessons`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  const result = (await response.json()) as {
+    success?: boolean;
+    message?: string;
+    data?: CourseLesson;
+  };
+
+  if (!response.ok) {
+    throw new Error(result.message ?? 'Unable to create lesson');
+  }
+
+  return result.data as CourseLesson;
 }

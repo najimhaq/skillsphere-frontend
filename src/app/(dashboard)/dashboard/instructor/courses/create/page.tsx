@@ -1,3 +1,4 @@
+// src/app/(dashboard)/dashboard/instructor/courses/create/page.tsx
 'use client';
 
 import { FormEvent, useState } from 'react';
