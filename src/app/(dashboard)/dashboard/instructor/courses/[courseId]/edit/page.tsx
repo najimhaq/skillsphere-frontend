@@ -291,14 +291,24 @@ export default function EditCoursePage() {
                 Category
               </label>
 
-              <input
+              <select
                 id='category'
                 value={form.category}
                 onChange={(event) =>
                   updateField('category', event.target.value)
                 }
-                className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
-              />
+                className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+              >
+                <option value='' disabled>
+                  Select a category
+                </option>
+                <option value='Web Development'>Web Development</option>
+                <option value='App Development'>App Development</option>
+                <option value='Programming'>Programming</option>
+                <option value='Design'>Design</option>
+                <option value='Tools'>Tools</option>
+                <option value='Business'>Business</option>
+              </select>
 
               {getFieldError('category') && (
                 <p className='mt-1 text-xs text-rose-600'>

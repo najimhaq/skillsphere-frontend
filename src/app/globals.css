@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background: #f8fafc;
@@ -37,3 +37,105 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* certificates page */
+@media print {
+    @page {
+      size: A4 landscape;
+      margin: 8mm;
+    }
+
+    html,
+    body {
+      width: 297mm;
+      min-height: 210mm;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body * {
+      visibility: hidden;
+    }
+
+    .no-print,
+    .no-print * {
+      display: none !important;
+    }
+
+    .print-certificate,
+    .print-certificate * {
+      visibility: visible;
+    }
+
+    .print-certificate {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      min-height: 190mm !important;
+      margin: 0 !important;
+      padding: 3mm !important;
+      overflow: hidden !important;
+      border-width: 3mm !important;
+      border-color: #e0e7ff !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    .print-certificate > div {
+      min-height: 180mm !important;
+      padding: 12mm 16mm !important;
+      border-radius: 0 !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    .print-certificate h1 {
+      font-size: 34pt !important;
+      line-height: 1.15 !important;
+    }
+
+    .print-certificate h2 {
+      font-size: 23pt !important;
+      line-height: 1.2 !important;
+    }
+
+    .print-certificate p {
+      line-height: 1.35 !important;
+    }
+
+    .print-certificate .mt-10 {
+      margin-top: 5mm !important;
+    }
+
+    .print-certificate .mt-8 {
+      margin-top: 4mm !important;
+    }
+
+    .print-certificate .mt-7 {
+      margin-top: 4mm !important;
+    }
+
+    .print-certificate .mt-6 {
+      margin-top: 3mm !important;
+    }
+
+    .print-certificate .mt-5 {
+      margin-top: 3mm !important;
+    }
+
+    .print-certificate .mt-3 {
+      margin-top: 2mm !important;
+    }
+
+   .print-certificate .py-12 {
+  padding-top: 10mm !important;
+  padding-bottom: 10mm !important;
+}
+  }

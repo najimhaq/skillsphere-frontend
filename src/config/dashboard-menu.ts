@@ -5,8 +5,10 @@ import {
   CirclePlus,
   GraduationCap,
   LayoutDashboard,
+  Search,
   Settings,
   Users,
+  User
 } from 'lucide-react';
 
 export type UserRole = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
@@ -30,8 +32,18 @@ export const dashboardMenus: Record<UserRole, DashboardMenuItem[]> = {
       icon: GraduationCap,
     },
     {
+      label: 'Browse Courses',
+      href: '/courses',
+      icon: Search,
+    },
+    {
       label: 'Profile',
       href: '/dashboard/student/profile',
+      icon: User,
+    },
+    {
+      label: 'Settings',
+      href: '/dashboard/student/settings',
       icon: Settings,
     },
   ],

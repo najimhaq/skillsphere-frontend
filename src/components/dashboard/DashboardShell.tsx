@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { LogOut,UserCircle2 } from 'lucide-react';
+import { LogOut, UserCircle2 } from 'lucide-react';
+import Image from 'next/image';
 
 import { authClient } from '@/lib/auth-client';
 import { dashboardMenus, type UserRole } from '@/config/dashboard-menu';
@@ -21,9 +22,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const role = (session?.user as { role?: UserRole } | undefined)?.role;
   const menuItems = role ? (dashboardMenus[role] ?? []) : [];
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (): Promise<void> => {
     await authClient.signOut();
     router.replace('/sign-in');
+    router.refresh();
   };
 
   if (isPending) {
@@ -46,6 +48,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             <h1 className='font-bold tracking-tight text-slate-900'>
               SkillSphere
             </h1>
+
             <p className='text-xs text-slate-500'>Dashboard</p>
           </div>
         </div>
@@ -53,7 +56,6 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         <nav className='flex-1 space-y-1 p-4'>
           {menuItems.map((item) => {
             const Icon = item.icon;
-
             const isCreateCourse = item.href.endsWith('/courses/create');
 
             const isActive = isCreateCourse
@@ -82,7 +84,17 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
         <div className='border-t border-slate-200 p-4'>
           <div className='mb-3 flex items-center gap-3 rounded-lg bg-slate-50 p-3'>
-            <UserCircle2 className='h-8 w-8 text-slate-400' />
+            {session?.user?.image ? (
+              <Image
+                src={session.user.image}
+                alt={session.user.name ?? 'User'}
+                width={36}
+                height={36}
+                className='h-9 w-9 shrink-0 rounded-full object-cover'
+              />
+            ) : (
+              <UserCircle2 className='h-9 w-9 shrink-0 text-slate-400' />
+            )}
 
             <div className='min-w-0'>
               <p className='truncate text-sm font-semibold text-slate-800'>
@@ -90,7 +102,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               </p>
 
               <p className='truncate text-xs text-slate-500'>
-                {session?.user?.email}
+                {session?.user?.email ?? ''}
               </p>
             </div>
           </div>

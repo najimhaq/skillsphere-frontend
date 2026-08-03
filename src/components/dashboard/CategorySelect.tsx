@@ -1,6 +1,7 @@
 // components/CategorySelect.tsx
 const categories = [
   'Web Development',
+  'App Development',
   'Programming',
   'Design',
   'Tools',

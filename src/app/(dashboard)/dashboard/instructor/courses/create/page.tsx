@@ -4,12 +4,7 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  ArrowLeft,
-  ImageIcon,
-  LoaderCircle,
-  Save,
-} from 'lucide-react';
+import { ArrowLeft, ImageIcon, LoaderCircle, Save } from 'lucide-react';
 
 import {
   createInstructorCourse,
@@ -256,6 +251,7 @@ export default function CreateCoursePage() {
                   Select a category
                 </option>
                 <option value='Web Development'>Web Development</option>
+                <option value='App Development'>App Development</option>
                 <option value='Programming'>Programming</option>
                 <option value='Design'>Design</option>
                 <option value='Tools'>Tools</option>
