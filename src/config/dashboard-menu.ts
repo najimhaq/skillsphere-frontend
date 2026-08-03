@@ -70,6 +70,11 @@ export const dashboardMenus: Record<UserRole, DashboardMenuItem[]> = {
       icon: Users,
     },
     {
+      label: 'Profile',
+      href: '/dashboard/instructor/profile',
+      icon: User,
+    },
+    {
       label: 'Settings',
       href: '/dashboard/instructor/settings',
       icon: Settings,
