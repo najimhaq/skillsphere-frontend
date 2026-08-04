@@ -17,6 +17,7 @@ import {
   UserCog,
   Users,
 } from 'lucide-react';
+import Image from 'next/image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -628,7 +629,7 @@ export default function AdminUsersPage() {
       ) : (
         <section className='mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm'>
           <div className='overflow-x-auto'>
-            <table className='min-w-[1000px] w-full text-left'>
+            <table className='min-w-250w-full text-left'>
               <thead className='border-b border-slate-200 bg-slate-50'>
                 <tr>
                   <th className='px-5 py-4 text-xs font-bold tracking-wide text-slate-500 uppercase'>
@@ -665,10 +666,13 @@ export default function AdminUsersPage() {
                       <td className='px-5 py-4'>
                         <div className='flex items-center gap-3'>
                           {user.image ? (
-                            <img
+                            <Image
                               src={user.image}
                               alt={user.name}
                               className='h-10 w-10 rounded-full border border-slate-200 object-cover'
+                              priority
+                              width={40}
+                              height={40}
                             />
                           ) : (
                             <div className='grid h-10 w-10 place-items-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700'>
@@ -712,7 +716,7 @@ export default function AdminUsersPage() {
                         <div className='flex items-center justify-end gap-2'>
                           <label className='relative'>
                             <span className='sr-only'>
-                              Change {user.name}'s role
+                              Change {user.name}&apos;s role
                             </span>
 
                             <select

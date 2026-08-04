@@ -15,12 +15,13 @@ export type InstructorCourse = {
   title: string;
   slug: string;
   shortDescription: string;
-  description: string;
+  thumbnailUrl?: string | null;
   category: string;
-  level: CourseLevel;
+  level: string;
   price: number;
-  thumbnailUrl: string | null;
-  status: CourseStatus;
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

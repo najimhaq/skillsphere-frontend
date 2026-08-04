@@ -5,11 +5,14 @@ import Link from 'next/link';
 import {
   AlertCircle,
   BookOpen,
+  CheckCircle2,
   CirclePlus,
   Clock3,
   Eye,
+  FileWarning,
   LoaderCircle,
   MoreVertical,
+  RefreshCw,
   Send,
   Trash2,
 } from 'lucide-react';
@@ -26,45 +29,61 @@ const statusStyle = {
   PENDING_REVIEW: 'bg-amber-100 text-amber-700',
   PUBLISHED: 'bg-emerald-100 text-emerald-700',
   REJECTED: 'bg-rose-100 text-rose-700',
-};
+  ARCHIVED: 'bg-zinc-200 text-zinc-700',
+} as const;
 
 const statusLabel = {
   DRAFT: 'Draft',
   PENDING_REVIEW: 'Pending review',
   PUBLISHED: 'Published',
   REJECTED: 'Rejected',
+  ARCHIVED: 'Archived',
+} as const;
+
+const formatDate = (dateString: string) => {
+  return new Intl.DateTimeFormat('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(dateString));
 };
 
 export default function InstructorCoursesPage() {
   const [courses, setCourses] = useState<InstructorCourse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [actionId, setActionId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadCourses = async () => {
       try {
-        setIsLoading(true);
-        setError('');
-
         const data = await getMyInstructorCourses();
 
-        if (isMounted) {
-          setCourses(data);
+        if (!isMounted) {
+          return;
         }
+
+        setCourses(data);
+        setError('');
       } catch (caughtError) {
-        if (isMounted) {
-          setError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : 'Unable to load your courses.'
-          );
+        if (!isMounted) {
+          return;
         }
+
+        setCourses([]);
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : 'Unable to load your courses.'
+        );
       } finally {
         if (isMounted) {
           setIsLoading(false);
+          setIsRefreshing(false);
         }
       }
     };
@@ -74,7 +93,12 @@ export default function InstructorCoursesPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [reloadKey]);
+
+  const refreshCourses = () => {
+    setIsRefreshing(true);
+    setReloadKey((currentValue) => currentValue + 1);
+  };
 
   const handleSubmitForReview = async (courseId: string) => {
     try {
@@ -86,7 +110,12 @@ export default function InstructorCoursesPage() {
       setCourses((currentCourses) =>
         currentCourses.map((course) =>
           course._id === courseId
-            ? { ...course, status: 'PENDING_REVIEW' }
+            ? {
+                ...course,
+                status: 'PENDING_REVIEW',
+                reviewNote: null,
+                reviewedAt: null,
+              }
             : course
         )
       );
@@ -106,7 +135,9 @@ export default function InstructorCoursesPage() {
       `Delete "${course.title}"? This action cannot be undone.`
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
       setActionId(course._id);
@@ -141,17 +172,31 @@ export default function InstructorCoursesPage() {
           </h1>
 
           <p className='mt-2 text-sm leading-6 text-slate-600'>
-            Create, update, and submit your courses for admin review.
+            Create, improve, and submit your courses for admin review.
           </p>
         </div>
 
-        <Link
-          href='/dashboard/instructor/courses/create'
-          className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700'
-        >
-          <CirclePlus className='h-4 w-4' />
-          Create a course
-        </Link>
+        <div className='flex flex-wrap gap-3'>
+          <button
+            type='button'
+            onClick={refreshCourses}
+            disabled={isRefreshing}
+            className='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+            />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+
+          <Link
+            href='/dashboard/instructor/courses/create'
+            className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700'
+          >
+            <CirclePlus className='h-4 w-4' />
+            Create a course
+          </Link>
+        </div>
       </section>
 
       {error && (
@@ -180,8 +225,8 @@ export default function InstructorCoursesPage() {
             </h2>
 
             <p className='mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500'>
-              Start creating your first course. It will be saved as a draft
-              until you submit it for review.
+              Start creating your first course. It will remain a draft until you
+              submit it for review.
             </p>
 
             <Link
@@ -197,7 +242,17 @@ export default function InstructorCoursesPage() {
         <section className='mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
           {courses.map((course) => {
             const isBusy = actionId === course._id;
-            const canManage = course.status === 'DRAFT';
+
+            const canEdit =
+              course.status === 'DRAFT' || course.status === 'REJECTED';
+
+            const canSubmit =
+              course.status === 'DRAFT' || course.status === 'REJECTED';
+
+            const canDelete =
+              course.status === 'DRAFT' || course.status === 'REJECTED';
+
+            const isPending = course.status === 'PENDING_REVIEW';
 
             return (
               <article
@@ -219,7 +274,9 @@ export default function InstructorCoursesPage() {
                   )}
 
                   <span
-                    className={`absolute right-3 top-3 z-10 rounded-full px-2.5 py-1 text-xs font-bold ${statusStyle[course.status]}`}
+                    className={`absolute top-3 right-3 z-10 rounded-full px-2.5 py-1 text-xs font-bold ${
+                      statusStyle[course.status]
+                    }`}
                   >
                     {statusLabel[course.status]}
                   </span>
@@ -254,49 +311,103 @@ export default function InstructorCoursesPage() {
                       {course.price === 0 ? 'Free' : `$${course.price}`}
                     </span>
                   </div>
-                  {/* all actions go here */}
+
+                  {course.reviewNote && (
+                    <div className='mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3'>
+                      <p className='flex items-center gap-2 text-xs font-bold text-amber-900'>
+                        <FileWarning className='h-4 w-4 text-amber-700' />
+                        Admin review feedback
+                      </p>
+
+                      <p className='mt-2 text-sm leading-6 text-amber-800'>
+                        {course.reviewNote}
+                      </p>
+
+                      {course.reviewedAt && (
+                        <p className='mt-2 text-xs font-medium text-amber-700'>
+                          Reviewed on {formatDate(course.reviewedAt)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {isPending && (
+                    <div className='mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800'>
+                      <Clock3 className='mt-0.5 h-4 w-4 shrink-0' />
+
+                      <p>
+                        Your course has been submitted and is waiting for admin
+                        review.
+                      </p>
+                    </div>
+                  )}
+
+                  {course.status === 'PUBLISHED' && (
+                    <div className='mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800'>
+                      <CheckCircle2 className='mt-0.5 h-4 w-4 shrink-0' />
+
+                      <p>
+                        Your course is live and visible in the public catalog.
+                      </p>
+                    </div>
+                  )}
+
+                  {course.status === 'ARCHIVED' && (
+                    <div className='mt-4 flex items-start gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700'>
+                      <Clock3 className='mt-0.5 h-4 w-4 shrink-0' />
+
+                      <p>
+                        This course has been archived and cannot be updated.
+                      </p>
+                    </div>
+                  )}
+
                   <div className='mt-5 flex flex-wrap gap-2'>
                     {course.status === 'PUBLISHED' ? (
                       <Link
                         href={`/courses/${course.slug}`}
+                        target='_blank'
                         className='inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
                       >
                         <Eye className='h-4 w-4 shrink-0' />
-                        View course
+                        View live course
+                      </Link>
+                    ) : canEdit ? (
+                      <Link
+                        href={`/dashboard/instructor/courses/${course._id}/edit`}
+                        className='inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                      >
+                        <Clock3 className='h-4 w-4 shrink-0' />
+                        {course.status === 'REJECTED'
+                          ? 'Improve course'
+                          : 'Edit draft'}
                       </Link>
                     ) : (
                       <Link
                         href={`/dashboard/instructor/courses/${course._id}/edit`}
                         className='inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
-                        title={
-                          course.status === 'DRAFT'
-                            ? 'Edit draft'
-                            : 'View details'
-                        }
                       >
-                        <Clock3 className='h-4 w-4 shrink-0' />
-                        {course.status === 'DRAFT'
-                          ? 'Edit draft'
-                          : 'View details'}
+                        <Eye className='h-4 w-4 shrink-0' />
+                        View details
                       </Link>
                     )}
 
-                    {course.status === 'DRAFT' && (
+                    {canEdit && (
                       <Link
                         href={`/dashboard/instructor/courses/${course._id}/content`}
                         className='inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100'
-                        title='Content'
+                        title='Manage course content'
                       >
                         <BookOpen className='h-4 w-4 shrink-0' />
                       </Link>
                     )}
 
-                    {course.status === 'DRAFT' && (
+                    {canSubmit && (
                       <button
                         type='button'
                         disabled={isBusy}
-                        onClick={() => handleSubmitForReview(course._id)}
-                        className='inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
+                        onClick={() => void handleSubmitForReview(course._id)}
+                        className='inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
                         title='Submit for review'
                       >
                         {isBusy ? (
@@ -304,14 +415,16 @@ export default function InstructorCoursesPage() {
                         ) : (
                           <Send className='h-4 w-4' />
                         )}
+
+                        {/* {course.status === 'REJECTED' ? 'Re-submit' : 'Submit'} */}
                       </button>
                     )}
 
-                    {canManage && (
+                    {canDelete && (
                       <button
                         type='button'
                         disabled={isBusy}
-                        onClick={() => handleDelete(course)}
+                        onClick={() => void handleDelete(course)}
                         className='inline-flex items-center justify-center rounded-lg border border-rose-200 px-3 py-2 text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60'
                         title='Delete course'
                       >

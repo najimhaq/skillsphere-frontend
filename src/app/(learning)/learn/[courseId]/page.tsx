@@ -1,3 +1,4 @@
+// src/app/(learning)/learn/[courseId]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -7,7 +8,6 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  BookOpenText,
   Check,
   CheckCircle2,
   ChevronDown,
