@@ -39,6 +39,12 @@ const dashboardByRole = {
   ADMIN: '/dashboard/admin',
 } as const;
 
+const settingsByRole = {
+  STUDENT: '/dashboard/student/settings',
+  INSTRUCTOR: '/dashboard/instructor/settings',
+  ADMIN: '/dashboard/admin/settings',
+} as const;
+
 type UserRole = keyof typeof dashboardByRole;
 
 const isUserRole = (value: unknown): value is UserRole => {
@@ -62,6 +68,7 @@ export function Navbar() {
   const user = session?.user;
   const role = isUserRole(user?.role) ? user.role : 'STUDENT';
   const dashboardPath = dashboardByRole[role];
+  const settingsPath = settingsByRole[role];
 
   const closeMenus = () => {
     setIsMenuOpen(false);
@@ -197,7 +204,7 @@ export function Navbar() {
                   </Link>
 
                   <Link
-                    href='/dashboard/student/settings'
+                    href={settingsPath}
                     onClick={closeMenus}
                     className='flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
                     role='menuitem'
@@ -316,9 +323,10 @@ export function Navbar() {
                 </Link>
 
                 <Link
-                  href='/dashboard/student/settings'
+                  href={settingsPath}
                   onClick={closeMenus}
-                  className='flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                  className='flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                  role='menuitem'
                 >
                   <UserRound className='size-4 text-slate-500' />
                   Account settings

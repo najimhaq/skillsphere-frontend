@@ -1,3 +1,4 @@
+// src/app/(dashboard)/dashboard/instructor/profile/page.tsx
 'use client';
 
 import {

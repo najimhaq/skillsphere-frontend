@@ -629,7 +629,7 @@ export default function AdminUsersPage() {
       ) : (
         <section className='mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm'>
           <div className='overflow-x-auto'>
-            <table className='min-w-250w-full text-left'>
+            <table className='min-w-250 w-full text-left'>
               <thead className='border-b border-slate-200 bg-slate-50'>
                 <tr>
                   <th className='px-5 py-4 text-xs font-bold tracking-wide text-slate-500 uppercase'>
