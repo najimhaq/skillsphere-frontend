@@ -570,46 +570,55 @@ export default function AdminCoursesPage() {
                     </div>
                   )}
 
-                  <div className='flex flex-wrap gap-2 border-t border-slate-100 pt-4'>
-                    <Link
-                      href={`/dashboard/admin/courses/${course._id}`}
-                      className='inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
-                    >
-                      <Eye className='h-4 w-4' />
-                      Review details
-                    </Link>
+                  <div className='border-t border-slate-100 pt-4'>
+                    <div className='flex flex-wrap gap-2'>
+                      <Link
+                        href={`/dashboard/admin/courses/${course._id}`}
+                        className='inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                      >
+                        <Eye className='h-4 w-4' />
+                        Review details
+                      </Link>
 
-                    {canReview && (
-                      <>
-                        <button
-                          type='button'
-                          onClick={() => openReviewModal(course, 'PUBLISH')}
-                          className='inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-sm font-semibold text-white transition hover:bg-emerald-700'
-                        >
-                          <CheckCircle2 className='h-4 w-4' />
-                          Publish
-                        </button>
+                      {canReview && (
+                        <>
+                          <button
+                            type='button'
+                            onClick={() => openReviewModal(course, 'PUBLISH')}
+                            className='inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-sm font-semibold text-white transition hover:bg-emerald-700'
+                          >
+                            <CheckCircle2 className='h-4 w-4' />
+                            Publish
+                          </button>
 
-                        <button
-                          type='button'
-                          onClick={() =>
-                            openReviewModal(course, 'REQUEST_CHANGES')
-                          }
-                          className='inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 text-sm font-semibold text-white transition hover:bg-amber-600'
-                        >
-                          <Send className='h-4 w-4' />
-                          Request changes
-                        </button>
+                          <button
+                            type='button'
+                            onClick={() =>
+                              openReviewModal(course, 'REQUEST_CHANGES')
+                            }
+                            className='inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 text-sm font-semibold text-white transition hover:bg-amber-600'
+                          >
+                            <Send className='h-4 w-4' />
+                            Request changes
+                          </button>
 
-                        <button
-                          type='button'
-                          onClick={() => openReviewModal(course, 'REJECT')}
-                          className='inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-sm font-semibold text-white transition hover:bg-rose-700'
-                        >
-                          <CircleX className='h-4 w-4' />
-                          Reject
-                        </button>
-                      </>
+                          <button
+                            type='button'
+                            onClick={() => openReviewModal(course, 'REJECT')}
+                            className='inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-sm font-semibold text-white transition hover:bg-rose-700'
+                          >
+                            <CircleX className='h-4 w-4' />
+                            Reject
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {course.status === 'DRAFT' && (
+                      <p className='mt-3 text-xs font-medium text-slate-500'>
+                        Waiting for the instructor to submit this course for
+                        review.
+                      </p>
                     )}
                   </div>
                 </div>
