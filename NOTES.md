@@ -82,3 +82,39 @@ Student browse course
 → Lesson open করে
 → Video / article পড়ে
 → Progress track করে
+
+
+Recommended order
+আমি এই sequence-এ কাজ করার পরামর্শ দিচ্ছি:
+
+Admin Dashboard Overview API + UI
+Real stats: total users, students, instructors, courses, pending-review courses, published courses, total enrollments।
+
+Pending Course Review Queue
+Admin শুধু PENDING_REVIEW course দেখবে; course details, sections, lessons এবং preview content দেখতে পারবে।
+
+Course moderation actions
+
+Publish
+
+Reject
+
+Request changes
+
+Admin feedback/note
+
+এখানে course model-এ reviewNote, reviewedBy, reviewedAt যোগ করব। Rejection-এর কারণ Instructor দেখবে, edit করে পুনরায় submit করতে পারবে।
+
+User management
+
+Search/filter users
+
+Account status: ACTIVE, SUSPENDED
+
+Suspend/reactivate
+
+Role change শুধুই carefully controlled action হিসেবে রাখব
+
+Audit logging
+Publish/reject/suspend/role-change সব action আলাদা AuditLog collection-এ রাখব।
+

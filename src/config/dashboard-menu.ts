@@ -98,9 +98,14 @@ export const dashboardMenus: Record<UserRole, DashboardMenuItem[]> = {
       icon: BookOpen,
     },
     {
-      label: 'Analytics',
-      href: '/dashboard/admin/analytics',
+      label: 'Audit Logs',
+      href: '/dashboard/admin/audit-logs',
       icon: BarChart3,
+    },
+    {
+      label: 'Profile',
+      href: '/dashboard/admin/profile',
+      icon: User,
     },
     {
       label: 'Settings',

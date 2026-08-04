@@ -102,3 +102,37 @@ export async function updateInstructorSettings(
     body: JSON.stringify(payload),
   });
 }
+
+
+//image upload
+type UploadProfileImageResponse = {
+  image: string;
+};
+
+export async function uploadInstructorProfileImage(
+  file: File
+): Promise<UploadProfileImageResponse> {
+  const formData = new FormData();
+
+  formData.append('image', file);
+
+  const response = await fetch(`${API_URL}/api/instructor/profile/image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiError(response));
+  }
+
+  const result = (await response.json()) as {
+    success: true;
+    message: string;
+    data: UploadProfileImageResponse;
+  };
+
+  return result.data;
+}
+
+/* import { FaGithub, FaLinkedin } from 'react-icons/fa'; */

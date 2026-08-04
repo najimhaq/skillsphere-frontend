@@ -1,9 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
 import Image from 'next/image';
 import {
   AlertCircle,
+  Camera,
   CheckCircle2,
   Globe2,
   ImageIcon,
@@ -12,15 +20,15 @@ import {
   Plus,
   Save,
   Trash2,
+  Upload,
   UserRound,
 } from 'lucide-react';
 import { FaGithub, FaLinkedin } from 'react-icons/fa';
 
-
-
 import {
   getInstructorProfile,
   updateInstructorProfile,
+  uploadInstructorProfileImage,
   type InstructorProfileResponse,
   type UpdateInstructorProfilePayload,
 } from '@/lib/instructor-profile-api';
@@ -42,6 +50,10 @@ const emptyForm: ProfileForm = {
   linkedinUrl: '',
   githubUrl: '',
 };
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const getInitials = (name: string) => {
   const initials = name
@@ -69,16 +81,27 @@ const profileToForm = (
 };
 
 export default function InstructorProfilePage() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [data, setData] = useState<InstructorProfileResponse | null>(null);
   const [form, setForm] = useState<ProfileForm>(emptyForm);
   const [expertiseInput, setExpertiseInput] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [localImagePreview, setLocalImagePreview] = useState<string | null>(
+    null
+  );
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   const bioLength = form.bio.length;
   const expertiseLimitReached = form.expertise.length >= 12;
+
+  const profileImage = localImagePreview ?? data?.user.image ?? null;
 
   const hasChanges = useMemo(() => {
     if (!data) {
@@ -126,6 +149,14 @@ export default function InstructorProfilePage() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (localImagePreview) {
+        URL.revokeObjectURL(localImagePreview);
+      }
+    };
+  }, [localImagePreview]);
+
   const updateField = <Key extends keyof ProfileForm>(
     field: Key,
     value: ProfileForm[Key]
@@ -136,6 +167,97 @@ export default function InstructorProfilePage() {
     }));
 
     setSuccessMessage('');
+  };
+
+  const handleSelectImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!allowedImageTypes.has(file.type)) {
+      setError('Please choose a JPEG, PNG, or WebP image.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError('Your profile image must be 5 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    if (localImagePreview) {
+      URL.revokeObjectURL(localImagePreview);
+    }
+
+    setSelectedImage(file);
+    setLocalImagePreview(URL.createObjectURL(file));
+    setError('');
+    setSuccessMessage('');
+  };
+
+  const handleUploadImage = async () => {
+    if (!selectedImage || !data) {
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const result = await uploadInstructorProfileImage(selectedImage);
+
+      setData((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          user: {
+            ...current.user,
+            image: result.image,
+          },
+        };
+      });
+
+      if (localImagePreview) {
+        URL.revokeObjectURL(localImagePreview);
+      }
+
+      setSelectedImage(null);
+      setLocalImagePreview(null);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      setSuccessMessage('Profile image updated successfully.');
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to upload your profile image.'
+      );
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const cancelSelectedImage = () => {
+    if (localImagePreview) {
+      URL.revokeObjectURL(localImagePreview);
+    }
+
+    setSelectedImage(null);
+    setLocalImagePreview(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const addExpertise = () => {
@@ -239,6 +361,7 @@ export default function InstructorProfilePage() {
       <div className='rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700'>
         <div className='flex items-start gap-3'>
           <AlertCircle className='mt-0.5 h-5 w-5 shrink-0' />
+
           <div>
             <p className='font-bold'>Unable to load your profile</p>
             <p className='mt-1'>{error || 'Please refresh and try again.'}</p>
@@ -277,6 +400,114 @@ export default function InstructorProfilePage() {
           <p>{successMessage}</p>
         </div>
       )}
+
+      <section className='mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6'>
+        <div className='flex flex-col gap-5 sm:flex-row sm:items-center'>
+          <div className='relative h-24 w-24 shrink-0'>
+            {profileImage ? (
+              <Image
+                src={profileImage}
+                alt={data.user.name}
+                fill
+                sizes='96px'
+                unoptimized={Boolean(localImagePreview)}
+                className='rounded-full object-cover'
+              />
+            ) : (
+              <div className='grid h-full w-full place-items-center rounded-full bg-indigo-100 text-xl font-bold text-indigo-700'>
+                {getInitials(data.user.name)}
+              </div>
+            )}
+
+            <button
+              type='button'
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingImage}
+              aria-label='Choose a profile image'
+              className='absolute -bottom-1 -right-1 grid h-9 w-9 place-items-center rounded-full border-4 border-white bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
+            >
+              <Camera className='h-4 w-4' />
+            </button>
+          </div>
+
+          <div className='min-w-0 flex-1'>
+            <div className='flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
+              <div>
+                <h2 className='truncate text-lg font-bold text-slate-900'>
+                  {data.user.name}
+                </h2>
+
+                <p className='mt-0.5 truncate text-sm text-slate-500'>
+                  {data.user.email}
+                </p>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type='file'
+                accept='image/jpeg,image/png,image/webp'
+                onChange={handleSelectImage}
+                className='hidden'
+              />
+
+              <button
+                type='button'
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className='inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+              >
+                <ImageIcon className='h-4 w-4' />
+                Choose image
+              </button>
+            </div>
+
+            {selectedImage ? (
+              <div className='mt-4 flex flex-col gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-3 sm:flex-row sm:items-center sm:justify-between'>
+                <div className='min-w-0'>
+                  <p className='truncate text-sm font-semibold text-indigo-900'>
+                    {selectedImage.name}
+                  </p>
+
+                  <p className='mt-0.5 text-xs text-indigo-700'>
+                    {(selectedImage.size / 1024 / 1024).toFixed(2)} MB · Ready
+                    to upload
+                  </p>
+                </div>
+
+                <div className='flex shrink-0 items-center gap-2'>
+                  <button
+                    type='button'
+                    onClick={cancelSelectedImage}
+                    disabled={isUploadingImage}
+                    className='inline-flex h-10 items-center justify-center rounded-xl px-3 text-sm font-semibold text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60'
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type='button'
+                    onClick={handleUploadImage}
+                    disabled={isUploadingImage}
+                    className='inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
+                  >
+                    {isUploadingImage ? (
+                      <LoaderCircle className='h-4 w-4 animate-spin' />
+                    ) : (
+                      <Upload className='h-4 w-4' />
+                    )}
+
+                    {isUploadingImage ? 'Uploading...' : 'Upload image'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className='mt-3 text-xs leading-5 text-slate-500'>
+                JPEG, PNG, or WebP. Maximum file size: 5 MB.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
 
       <div className='mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]'>
         <form
@@ -488,12 +719,13 @@ export default function InstructorProfilePage() {
           </p>
 
           <div className='mt-5 flex items-center gap-3'>
-            {data.user.image ? (
+            {profileImage ? (
               <Image
-                src={data.user.image}
+                src={profileImage}
                 alt={data.user.name}
                 width={56}
                 height={56}
+                unoptimized={Boolean(localImagePreview)}
                 className='h-14 w-14 rounded-full object-cover'
               />
             ) : (
@@ -526,7 +758,7 @@ export default function InstructorProfilePage() {
 
             <p className='flex items-center gap-2 text-slate-600'>
               <ImageIcon className='h-4 w-4 text-slate-400' />
-              Avatar managed by your account
+              Image hosted securely on ImgBB
             </p>
           </div>
 
