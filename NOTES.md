@@ -118,3 +118,43 @@ Role change শুধুই carefully controlled action হিসেবে র�
 Audit logging
 Publish/reject/suspend/role-change সব action আলাদা AuditLog collection-এ রাখব।
 
+জরুরি
+Duplicate payment protection: একই student/course-এর জন্য active paid enrollment থাকলে নতুন checkout নিষিদ্ধ
+
+Idempotency: webhook একই event একাধিকবার পাঠালেও একবারই payment/enrollment process হবে
+
+Price snapshot: payment তৈরির সময় amount/currency save হবে, পরে course price বদলালেও পুরনো transaction বদলাবে না
+
+Expired pending payment: যেমন 30 মিনিট পরে EXPIRED
+
+Failed/cancelled payment state
+
+Enrollment only after verified payment
+
+Payment Activity Log: PAYMENT_SUCCEEDED, PAYMENT_FAILED, REFUND_ISSUED
+
+পরে যোগ করবেন
+Coupon / discount code
+
+Refund request workflow
+
+Invoice/receipt
+
+Instructor revenue sharing / payout
+
+Admin revenue dashboard
+
+VAT/tax support
+
+Subscription/membership plan
+
+
+| Priority | Feature                                                                |
+| -------- | ---------------------------------------------------------------------- |
+| 1        | Payment + verified enrollment                                          |
+| 2        | Admin payment management and revenue overview                          |
+| 3        | Maintenance mode বাস্তবে public routes/API-তে enforce করা              |
+| 4        | Email notifications: payment receipt, enrollment, course review result |
+| 5        | Quiz/assignment                                                        |
+| 6        | Instructor analytics: enrollment, completion, revenue                  |
+| 7        | Coupons/refunds/payouts                                                |

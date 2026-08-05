@@ -1,67 +1,131 @@
 'use client';
 
 import { useState } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  CheckCircle2,
+  CircleDollarSign,
+  LoaderCircle,
+  LogIn,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { enrollInCourse } from '@/lib/enrollment-api';
+import { authClient } from '@/lib/auth-client';
+import { enrollInCourse } from '@/lib/student-enrollment-api';
+import { createStripeCheckout } from '@/lib/payment-api';
 
 type EnrollButtonProps = {
   courseId: string;
+  price: number;
 };
 
-export function EnrollButton({ courseId }: EnrollButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isEnrolled, setIsEnrolled] = useState(false);
+export function EnrollButton({ courseId, price }: EnrollButtonProps) {
+  const router = useRouter();
+  const { data: session, isPending } = authClient.useSession();
 
-  const handleEnroll = async () => {
-    setIsLoading(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const isFreeCourse = price === 0;
+
+  const handleAction = async () => {
+    if (isPending || isProcessing) {
+      return;
+    }
+
+    if (!session?.user) {
+      const redirectUrl = encodeURIComponent(window.location.pathname);
+
+      router.push(`/sign-in?redirect=${redirectUrl}`);
+      return;
+    }
+
+    if (session.user.role !== 'STUDENT') {
+      toast.error('Only student accounts can enroll in or purchase courses.');
+      return;
+    }
+
+    setIsProcessing(true);
 
     try {
-      await enrollInCourse(courseId);
+      if (isFreeCourse) {
+        await enrollInCourse(courseId);
 
-      setIsEnrolled(true);
+        toast.success('You are enrolled successfully.');
 
-      toast.success('You are enrolled! Your learning journey starts now.');
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Could not enroll in this course';
-
-      if (message === 'Authentication required') {
-        toast.error('Please sign in before enrolling.');
+        router.push('/dashboard/student/my-learning');
+        router.refresh();
         return;
       }
 
-      if (message === 'You are already enrolled in this course') {
-        setIsEnrolled(true);
+      const { checkoutUrl } = await createStripeCheckout(courseId);
+
+      window.location.assign(checkoutUrl);
+    } catch (caughtError) {
+      const error = caughtError as Error & {
+        status?: number;
+      };
+
+      if (error.status === 401) {
+        const redirectUrl = encodeURIComponent(window.location.pathname);
+
+        router.push(`/sign-in?redirect=${redirectUrl}`);
+        return;
+      }
+
+      if (error.status === 409) {
         toast.success('You are already enrolled in this course.');
+
+        router.push('/dashboard/student/my-learning');
+        router.refresh();
         return;
       }
 
-      toast.error(message);
+      toast.error(
+        error.message ||
+          (isFreeCourse
+            ? 'Unable to enroll in this course.'
+            : 'Unable to start checkout.')
+      );
     } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
     }
   };
+
+  const buttonLabel = !session?.user
+    ? isFreeCourse
+      ? 'Sign in to enroll'
+      : 'Sign in to buy'
+    : isFreeCourse
+      ? 'Enroll for free'
+      : `Buy now — $${price.toFixed(2)}`;
 
   return (
     <button
       type='button'
-      onClick={handleEnroll}
-      disabled={isLoading || isEnrolled}
-      className='mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-500 px-5 py-3 font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:bg-emerald-600 disabled:hover:bg-emerald-600'
+      onClick={() => void handleAction()}
+      disabled={isPending || isProcessing}
+      className='mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
     >
-      {isLoading ? (
+      {isPending || isProcessing ? (
         <>
-          <LoaderCircle className='size-5 animate-spin' aria-hidden='true' />
-          Enrolling...
+          <LoaderCircle className='h-4 w-4 animate-spin' />
+          {isFreeCourse ? 'Enrolling...' : 'Opening secure checkout...'}
         </>
-      ) : isEnrolled ? (
-        'Enrolled'
+      ) : !session?.user ? (
+        <>
+          <LogIn className='h-4 w-4' />
+          {buttonLabel}
+        </>
+      ) : isFreeCourse ? (
+        <>
+          <CheckCircle2 className='h-4 w-4' />
+          {buttonLabel}
+        </>
       ) : (
-        'Enroll now'
+        <>
+          <CircleDollarSign className='h-4 w-4' />
+          {buttonLabel}
+        </>
       )}
     </button>
   );

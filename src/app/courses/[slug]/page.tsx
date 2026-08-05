@@ -123,10 +123,12 @@ export default async function CourseDetailPage({
                 </span>
               </div>
 
-              <EnrollButton courseId={course._id} />
+              <EnrollButton courseId={course._id} price={course.price} />
 
               <p className='mt-3 text-center text-xs text-slate-400'>
-                Enroll now and start learning at your own pace.
+                {course.price === 0
+                  ? 'Enroll for free and start learning at your own pace.'
+                  : 'Secure payment is processed by Stripe Checkout.'}
               </p>
             </div>
           </div>

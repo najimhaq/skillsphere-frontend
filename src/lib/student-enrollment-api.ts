@@ -27,16 +27,61 @@ export type StudentEnrollment = {
 };
 
 type ApiErrorResponse = {
+  success?: boolean;
   message?: string;
+};
+
+type EnrollInCourseResponse = {
+  success: true;
+  message: string;
+  data: {
+    _id: string;
+    studentId: string;
+    courseId: string;
+    status: EnrollmentStatus;
+    progressPercentage: number;
+    enrolledAt: string;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
 };
 
 async function getApiError(response: Response): Promise<string> {
   try {
     const result = (await response.json()) as ApiErrorResponse;
-    return result.message ?? 'Something went wrong';
+
+    return result.message ?? 'Something went wrong.';
   } catch {
-    return 'Something went wrong';
+    return 'Something went wrong.';
   }
+}
+
+export async function enrollInCourse(
+  courseId: string
+): Promise<EnrollInCourseResponse> {
+  const response = await fetch(
+    `${API_URL}/api/enrollments/courses/${courseId}/enroll`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = new Error(await getApiError(response)) as Error & {
+      status?: number;
+    };
+
+    error.status = response.status;
+
+    throw error;
+  }
+
+  return (await response.json()) as EnrollInCourseResponse;
 }
 
 export async function getMyEnrollments(): Promise<StudentEnrollment[]> {
@@ -51,6 +96,7 @@ export async function getMyEnrollments(): Promise<StudentEnrollment[]> {
   }
 
   const result = (await response.json()) as {
+    success: true;
     data: StudentEnrollment[];
   };
 
