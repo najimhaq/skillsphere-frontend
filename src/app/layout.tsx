@@ -10,6 +10,7 @@ import { SmoothScrollProvider } from '@/components/providers/smooth-scroll-provi
 import { ScrollReset } from '@/components/ui/scroll-reset';
 import { ScrollProgress } from '@/components/ui/scroll-progress';
 import { BackToTop } from '@/components/ui/back-to-top';
+import ConditionalFooter from '@/components/layout/ConditionalFooter';
 
 export const metadata: Metadata = {
   title: {
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </main>
 
           <BackToTop />
+          <ConditionalFooter />
         </SmoothScrollProvider>
 
         <Toaster

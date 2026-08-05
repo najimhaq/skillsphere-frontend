@@ -243,7 +243,7 @@ export function Navbar() {
               </Link>
 
               <Link
-                href='/sign-up'
+                href='/courses'
                 className='rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700'
               >
                 Get started

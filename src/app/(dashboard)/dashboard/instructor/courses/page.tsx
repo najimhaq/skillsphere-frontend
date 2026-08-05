@@ -239,7 +239,7 @@ export default function InstructorCoursesPage() {
           </div>
         </section>
       ) : (
-        <section className='mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
+        <section className='mt-8 grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3'>
           {courses.map((course) => {
             const isBusy = actionId === course._id;
 
@@ -257,9 +257,9 @@ export default function InstructorCoursesPage() {
             return (
               <article
                 key={course._id}
-                className='overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm'
+                className='flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm'
               >
-                <div className='relative h-48 w-full overflow-hidden bg-linear-to-br from-indigo-100 via-violet-100 to-sky-100'>
+                <div className='relative h-48 w-full shrink-0 overflow-hidden bg-linear-to-br from-indigo-100 via-violet-100 to-sky-100'>
                   {course.thumbnailUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -282,7 +282,7 @@ export default function InstructorCoursesPage() {
                   </span>
                 </div>
 
-                <div className='p-5'>
+                <div className='flex flex-1 flex-col p-5'>
                   <div className='flex items-start justify-between gap-3'>
                     <div className='min-w-0'>
                       <p className='text-xs font-semibold uppercase tracking-wide text-indigo-600'>
@@ -362,7 +362,7 @@ export default function InstructorCoursesPage() {
                     </div>
                   )}
 
-                  <div className='mt-5 flex flex-wrap gap-2'>
+                  <div className='mt-auto flex flex-wrap gap-2 pt-5'>
                     {course.status === 'PUBLISHED' ? (
                       <Link
                         href={`/courses/${course.slug}`}
@@ -415,8 +415,6 @@ export default function InstructorCoursesPage() {
                         ) : (
                           <Send className='h-4 w-4' />
                         )}
-
-                        {/* {course.status === 'REJECTED' ? 'Re-submit' : 'Submit'} */}
                       </button>
                     )}
 

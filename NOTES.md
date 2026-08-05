@@ -158,3 +158,5 @@ Subscription/membership plan
 | 5        | Quiz/assignment                                                        |
 | 6        | Instructor analytics: enrollment, completion, revenue                  |
 | 7        | Coupons/refunds/payouts                                                |
+
+

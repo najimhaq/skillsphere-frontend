@@ -10,6 +10,7 @@ import {
   LoaderCircle,
   LockKeyhole,
 } from 'lucide-react';
+import { FcGoogle } from 'react-icons/fc';
 
 import { authClient } from '@/lib/auth-client';
 
@@ -21,6 +22,7 @@ export default function SignInPage() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
 
   useEffect(() => {
     if (!isPending && session?.user) {
@@ -28,6 +30,31 @@ export default function SignInPage() {
     }
   }, [isPending, router, session?.user]);
 
+  const handleGoogleSignIn = async (): Promise<void> => {
+    try {
+      setIsGoogleSigningIn(true);
+      setError('');
+
+      const { error: googleSignInError } = await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: `${window.location.origin}/dashboard`,
+      });
+
+      if (googleSignInError) {
+        setError(
+          googleSignInError.message ?? 'Unable to continue with Google.'
+        );
+      }
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to continue with Google.'
+      );
+    } finally {
+      setIsGoogleSigningIn(false);
+    }
+  };
   const handleSubmit = async (
     event: SubmitEvent<HTMLFormElement>
   ): Promise<void> => {
@@ -150,6 +177,25 @@ export default function SignInPage() {
               <>
                 Sign in
                 <ArrowRight className='h-4 w-4' />
+              </>
+            )}
+          </button>
+          {/* google */}
+          <button
+            type='button'
+            onClick={() => void handleGoogleSignIn()}
+            disabled={isGoogleSigningIn || isSubmitting}
+            className='flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+          >
+            {isGoogleSigningIn ? (
+              <>
+                <LoaderCircle className='h-4 w-4 animate-spin' />
+                Connecting to Google...
+              </>
+            ) : (
+              <>
+                <FcGoogle className='h-5 w-5' />
+                Continue with Google
               </>
             )}
           </button>

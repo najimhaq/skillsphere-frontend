@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import {
   AlertCircle,
+  AlertTriangle,
   BadgeCheck,
   Ban,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
@@ -17,7 +18,6 @@ import {
   UserCog,
   Users,
 } from 'lucide-react';
-import Image from 'next/image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -36,139 +36,70 @@ type AdminUser = {
   updatedAt: string;
 };
 
-type UsersResponse = {
-  success: true;
-  data: AdminUser[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+type Meta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 };
 
-type FailedResponse = {
-  success: false;
-  message?: string;
-};
+type ApiResponse =
+  | { success: true; data: AdminUser[]; meta: Meta }
+  | { success: false; message?: string };
 
-type RoleFilter = 'ALL' | UserRole;
-type StatusFilter = 'ALL' | AccountStatus;
+const getErrorMessage = (result: unknown, fallback: string) =>
+  typeof result === 'object' &&
+  result !== null &&
+  'message' in result &&
+  typeof result.message === 'string'
+    ? result.message
+    : fallback;
 
-const roleOptions: Array<{
-  value: RoleFilter;
-  label: string;
-}> = [
-  { value: 'ALL', label: 'All roles' },
-  { value: 'STUDENT', label: 'Students' },
-  { value: 'INSTRUCTOR', label: 'Instructors' },
-  { value: 'ADMIN', label: 'Admins' },
-];
-
-const statusOptions: Array<{
-  value: StatusFilter;
-  label: string;
-}> = [
-  { value: 'ALL', label: 'All account statuses' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'SUSPENDED', label: 'Suspended' },
-];
-
-const roleSelectOptions: Array<{
-  value: UserRole;
-  label: string;
-}> = [
-  { value: 'STUDENT', label: 'Student' },
-  { value: 'INSTRUCTOR', label: 'Instructor' },
-  { value: 'ADMIN', label: 'Admin' },
-];
-
-const formatDate = (dateString: string) => {
-  return new Intl.DateTimeFormat('en-US', {
+const formatDate = (date: string) =>
+  new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(dateString));
-};
+  }).format(new Date(date));
 
-const getInitials = (name: string) => {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((word) => word.charAt(0))
-      .join('')
-      .toUpperCase() || 'U'
-  );
-};
+const getInitials = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word.charAt(0))
+    .join('')
+    .toUpperCase() || 'U';
 
-const getErrorMessage = (result: unknown, fallback: string) => {
-  if (
-    typeof result === 'object' &&
-    result !== null &&
-    'message' in result &&
-    typeof result.message === 'string'
-  ) {
-    return result.message;
+const roleBadge = (role: UserRole) => {
+  if (role === 'ADMIN') {
+    return { label: 'Admin', color: 'bg-indigo-100 text-indigo-700' };
   }
 
-  return fallback;
-};
-
-const getRoleBadge = (role: UserRole) => {
-  const styles: Record<
-    UserRole,
-    {
-      label: string;
-      className: string;
-    }
-  > = {
-    STUDENT: {
-      label: 'Student',
-      className: 'bg-sky-100 text-sky-700',
-    },
-    INSTRUCTOR: {
+  if (role === 'INSTRUCTOR') {
+    return {
       label: 'Instructor',
-      className: 'bg-violet-100 text-violet-700',
-    },
-    ADMIN: {
-      label: 'Admin',
-      className: 'bg-indigo-100 text-indigo-700',
-    },
-  };
+      color: 'bg-violet-100 text-violet-700',
+    };
+  }
 
-  return styles[role];
+  return { label: 'Student', color: 'bg-sky-100 text-sky-700' };
 };
 
-const getAccountStatusBadge = (accountStatus: AccountStatus) => {
-  const styles: Record<
-    AccountStatus,
-    {
-      label: string;
-      className: string;
-    }
-  > = {
-    ACTIVE: {
-      label: 'Active',
-      className: 'bg-emerald-100 text-emerald-700',
-    },
-    SUSPENDED: {
-      label: 'Suspended',
-      className: 'bg-rose-100 text-rose-700',
-    },
-  };
-
-  return styles[accountStatus];
-};
+const statusBadge = (status: AccountStatus) =>
+  status === 'ACTIVE'
+    ? { label: 'Active', color: 'bg-emerald-100 text-emerald-700' }
+    : { label: 'Suspended', color: 'bg-rose-100 text-rose-700' };
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [page, setPage] = useState(1);
+  const [roleFilter, setRoleFilter] = useState<'ALL' | UserRole>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | AccountStatus>(
+    'ALL'
+  );
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
 
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -177,52 +108,49 @@ export default function AdminUsersPage() {
   const [actionError, setActionError] = useState('');
   const [pendingActionUserId, setPendingActionUserId] = useState('');
 
-  const [meta, setMeta] = useState({
+  const [meta, setMeta] = useState<Meta>({
     page: 1,
     limit: 10,
     total: 0,
     totalPages: 1,
   });
 
-  const activeUserCount = useMemo(() => {
-    return users.filter((user) => user.accountStatus === 'ACTIVE').length;
-  }, [users]);
+  const [roleChangeTarget, setRoleChangeTarget] = useState<{
+    user: AdminUser;
+    nextRole: UserRole;
+  } | null>(null);
+
+  const activeUserCount = useMemo(
+    () => users.filter((user) => user.accountStatus === 'ACTIVE').length,
+    [users]
+  );
 
   useEffect(() => {
     const controller = new AbortController();
 
-    const fetchUsers = async () => {
+    const loadUsers = async () => {
       try {
-        const queryParams = new URLSearchParams({
+        const params = new URLSearchParams({
           page: String(page),
           limit: '10',
         });
 
-        if (roleFilter !== 'ALL') {
-          queryParams.set('role', roleFilter);
-        }
-
+        if (roleFilter !== 'ALL') params.set('role', roleFilter);
         if (statusFilter !== 'ALL') {
-          queryParams.set('accountStatus', statusFilter);
+          params.set('accountStatus', statusFilter);
         }
-
-        if (searchQuery.trim()) {
-          queryParams.set('search', searchQuery.trim());
-        }
+        if (searchQuery.trim()) params.set('search', searchQuery.trim());
 
         const response = await fetch(
-          `${API_URL}/api/admin/users?${queryParams.toString()}`,
+          `${API_URL}/api/admin/users?${params.toString()}`,
           {
-            method: 'GET',
             credentials: 'include',
             cache: 'no-store',
             signal: controller.signal,
           }
         );
 
-        const result = (await response.json()) as
-          | UsersResponse
-          | FailedResponse;
+        const result = (await response.json()) as ApiResponse;
 
         if (!response.ok || !result.success) {
           throw new Error(getErrorMessage(result, 'Unable to load users.'));
@@ -253,35 +181,12 @@ export default function AdminUsersPage() {
       }
     };
 
-    void fetchUsers();
+    void loadUsers();
 
-    return () => {
-      controller.abort();
-    };
-  }, [page, reloadKey, roleFilter, searchQuery, statusFilter]);
+    return () => controller.abort();
+  }, [page, roleFilter, statusFilter, searchQuery, reloadKey]);
 
-  const refreshUsers = () => {
-    setIsRefreshing(true);
-    setReloadKey((currentValue) => currentValue + 1);
-  };
-
-  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setPage(1);
-    setSearchQuery(searchInput.trim());
-  };
-
-  const handleRoleFilterChange = (nextRole: RoleFilter) => {
-    setPage(1);
-    setRoleFilter(nextRole);
-  };
-
-  const handleStatusFilterChange = (nextStatus: StatusFilter) => {
-    setPage(1);
-    setStatusFilter(nextStatus);
-  };
-
-  const updateUserInState = (updatedUser: AdminUser) => {
+  const updateUser = (updatedUser: AdminUser) => {
     setUsers((currentUsers) =>
       currentUsers.map((user) =>
         user._id === updatedUser._id ? updatedUser : user
@@ -289,18 +194,24 @@ export default function AdminUsersPage() {
     );
   };
 
-  const handleRoleChange = async (user: AdminUser, nextRole: UserRole) => {
-    if (user.role === nextRole || pendingActionUserId) {
-      return;
-    }
+  const closeRoleModal = () => {
+    if (pendingActionUserId) return;
 
-    const confirmed = window.confirm(
-      `Change ${user.name}'s role from ${user.role} to ${nextRole}?`
-    );
+    setActionError('');
+    setRoleChangeTarget(null);
+  };
 
-    if (!confirmed) {
-      return;
-    }
+  const openRoleModal = (user: AdminUser, nextRole: UserRole) => {
+    if (user.role === nextRole || pendingActionUserId) return;
+
+    setActionError('');
+    setRoleChangeTarget({ user, nextRole });
+  };
+
+  const confirmRoleChange = async () => {
+    if (!roleChangeTarget) return;
+
+    const { user, nextRole } = roleChangeTarget;
 
     setPendingActionUserId(user._id);
     setActionError('');
@@ -311,22 +222,14 @@ export default function AdminUsersPage() {
         {
           method: 'PATCH',
           credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            role: nextRole,
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: nextRole }),
         }
       );
 
       const result = (await response.json()) as
-        | {
-            success: true;
-            message: string;
-            data: AdminUser;
-          }
-        | FailedResponse;
+        | { success: true; data: AdminUser; message: string }
+        | { success: false; message?: string };
 
       if (!response.ok || !result.success) {
         throw new Error(
@@ -334,7 +237,8 @@ export default function AdminUsersPage() {
         );
       }
 
-      updateUserInState(result.data);
+      updateUser(result.data);
+      setRoleChangeTarget(null);
     } catch (caughtError) {
       setActionError(
         caughtError instanceof Error
@@ -346,21 +250,15 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleAccountStatusChange = async (user: AdminUser) => {
-    if (pendingActionUserId) {
-      return;
-    }
+  const changeAccountStatus = async (user: AdminUser) => {
+    if (pendingActionUserId) return;
 
     const nextStatus: AccountStatus =
       user.accountStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
 
-    const actionLabel = nextStatus === 'SUSPENDED' ? 'suspend' : 'reactivate';
+    const action = nextStatus === 'SUSPENDED' ? 'suspend' : 'reactivate';
 
-    const confirmed = window.confirm(
-      `Are you sure you want to ${actionLabel} ${user.name}?`
-    );
-
-    if (!confirmed) {
+    if (!window.confirm(`Are you sure you want to ${action} ${user.name}?`)) {
       return;
     }
 
@@ -373,47 +271,31 @@ export default function AdminUsersPage() {
         {
           method: 'PATCH',
           credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            accountStatus: nextStatus,
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountStatus: nextStatus }),
         }
       );
 
       const result = (await response.json()) as
-        | {
-            success: true;
-            message: string;
-            data: AdminUser;
-          }
-        | FailedResponse;
+        | { success: true; data: AdminUser; message: string }
+        | { success: false; message?: string };
 
       if (!response.ok || !result.success) {
         throw new Error(
-          getErrorMessage(result, `Unable to ${actionLabel} this user.`)
+          getErrorMessage(result, `Unable to ${action} this user.`)
         );
       }
 
-      updateUserInState(result.data);
+      updateUser(result.data);
     } catch (caughtError) {
       setActionError(
         caughtError instanceof Error
           ? caughtError.message
-          : `Unable to ${actionLabel} this user.`
+          : `Unable to ${action} this user.`
       );
     } finally {
       setPendingActionUserId('');
     }
-  };
-
-  const goToPage = (nextPage: number) => {
-    if (nextPage < 1 || nextPage > meta.totalPages || nextPage === page) {
-      return;
-    }
-
-    setPage(nextPage);
   };
 
   return (
@@ -423,21 +305,21 @@ export default function AdminUsersPage() {
           <p className='text-sm font-semibold text-indigo-600'>
             Administration
           </p>
-
-          <h1 className='mt-1 text-3xl font-bold tracking-tight text-slate-900'>
+          <h1 className='mt-1 text-3xl font-bold text-slate-900'>
             User management
           </h1>
-
-          <p className='mt-2 text-sm leading-6 text-slate-600'>
+          <p className='mt-2 text-sm text-slate-600'>
             Search users, manage account access, and assign platform roles.
           </p>
         </div>
 
         <button
           type='button'
-          onClick={refreshUsers}
-          disabled={isRefreshing}
-          className='inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+          onClick={() => {
+            setIsRefreshing(true);
+            setReloadKey((value) => value + 1);
+          }}
+          className='inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700'
         >
           <RefreshCw
             className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
@@ -447,245 +329,175 @@ export default function AdminUsersPage() {
       </section>
 
       <section className='mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
-        <article className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-          <div className='flex items-center justify-between gap-3'>
-            <div>
-              <p className='text-sm font-medium text-slate-500'>
-                Total matching users
-              </p>
-              <p className='mt-2 text-2xl font-bold tracking-tight text-slate-900'>
-                {meta.total}
-              </p>
-            </div>
+        {[
+          [
+            'Total matching users',
+            meta.total,
+            Users,
+            'bg-indigo-100 text-indigo-700',
+          ],
+          [
+            'Active on this page',
+            activeUserCount,
+            BadgeCheck,
+            'bg-emerald-100 text-emerald-700',
+          ],
+          [
+            'Current page',
+            `${meta.page} / ${meta.totalPages}`,
+            CircleUserRound,
+            'bg-violet-100 text-violet-700',
+          ],
+          ['Page size', meta.limit, UserCog, 'bg-amber-100 text-amber-700'],
+        ].map(([label, value, Icon, color]) => {
+          const CardIcon = Icon as typeof Users;
 
-            <div className='grid h-11 w-11 place-items-center rounded-xl bg-indigo-100 text-indigo-700'>
-              <Users className='h-5 w-5' />
-            </div>
-          </div>
-        </article>
-
-        <article className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-          <div className='flex items-center justify-between gap-3'>
-            <div>
-              <p className='text-sm font-medium text-slate-500'>
-                Active on this page
-              </p>
-              <p className='mt-2 text-2xl font-bold tracking-tight text-slate-900'>
-                {activeUserCount}
-              </p>
-            </div>
-
-            <div className='grid h-11 w-11 place-items-center rounded-xl bg-emerald-100 text-emerald-700'>
-              <BadgeCheck className='h-5 w-5' />
-            </div>
-          </div>
-        </article>
-
-        <article className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-          <div className='flex items-center justify-between gap-3'>
-            <div>
-              <p className='text-sm font-medium text-slate-500'>Current page</p>
-              <p className='mt-2 text-2xl font-bold tracking-tight text-slate-900'>
-                {meta.page} / {meta.totalPages}
-              </p>
-            </div>
-
-            <div className='grid h-11 w-11 place-items-center rounded-xl bg-violet-100 text-violet-700'>
-              <CircleUserRound className='h-5 w-5' />
-            </div>
-          </div>
-        </article>
-
-        <article className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-          <div className='flex items-center justify-between gap-3'>
-            <div>
-              <p className='text-sm font-medium text-slate-500'>Page size</p>
-              <p className='mt-2 text-2xl font-bold tracking-tight text-slate-900'>
-                {meta.limit}
-              </p>
-            </div>
-
-            <div className='grid h-11 w-11 place-items-center rounded-xl bg-amber-100 text-amber-700'>
-              <UserCog className='h-5 w-5' />
-            </div>
-          </div>
-        </article>
+          return (
+            <article
+              key={String(label)}
+              className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'
+            >
+              <div className='flex items-center justify-between'>
+                <div>
+                  <p className='text-sm text-slate-500'>{String(label)}</p>
+                  <p className='mt-2 text-2xl font-bold text-slate-900'>
+                    {String(value)}
+                  </p>
+                </div>
+                <div
+                  className={`grid h-11 w-11 place-items-center rounded-xl ${String(color)}`}
+                >
+                  <CardIcon className='h-5 w-5' />
+                </div>
+              </div>
+            </article>
+          );
+        })}
       </section>
 
-      <section className='mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5'>
-        <div className='flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between'>
+      <section className='mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'>
+        <div className='flex flex-col gap-4 xl:flex-row xl:justify-between'>
           <form
-            onSubmit={handleSearchSubmit}
+            onSubmit={(event) => {
+              event.preventDefault();
+              setPage(1);
+              setSearchQuery(searchInput.trim());
+            }}
             className='flex w-full max-w-xl gap-2'
           >
-            <label className='relative min-w-0 flex-1'>
-              <span className='sr-only'>Search users</span>
-
-              <Search className='pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400' />
-
+            <label className='relative flex-1'>
+              <Search className='absolute top-1/2 left-3 -translate-y-1/2 text-slate-400' />
               <input
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 placeholder='Search by name or email...'
-                className='h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pr-3 pl-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
+                className='h-11 w-full rounded-xl border border-slate-200 py-2 pr-3 pl-10 text-sm outline-none'
               />
             </label>
 
             <button
               type='submit'
-              className='h-11 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700'
+              className='rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white'
             >
               Search
             </button>
           </form>
 
           <div className='grid gap-3 sm:grid-cols-2'>
-            <label className='relative'>
-              <span className='sr-only'>Filter by role</span>
+            <select
+              value={roleFilter}
+              onChange={(event) => {
+                setPage(1);
+                setRoleFilter(event.target.value as 'ALL' | UserRole);
+              }}
+              className='h-11 rounded-xl border border-slate-200 px-3 text-sm'
+            >
+              <option value='ALL'>All roles</option>
+              <option value='STUDENT'>Students</option>
+              <option value='INSTRUCTOR'>Instructors</option>
+              <option value='ADMIN'>Admins</option>
+            </select>
 
-              <select
-                value={roleFilter}
-                onChange={(event) =>
-                  handleRoleFilterChange(event.target.value as RoleFilter)
-                }
-                className='h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white py-2 pr-10 pl-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 sm:w-44'
-              >
-                {roleOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-
-              <ChevronDown className='pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-500' />
-            </label>
-
-            <label className='relative'>
-              <span className='sr-only'>Filter by account status</span>
-
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  handleStatusFilterChange(event.target.value as StatusFilter)
-                }
-                className='h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white py-2 pr-10 pl-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 sm:w-52'
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-
-              <ChevronDown className='pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-500' />
-            </label>
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setPage(1);
+                setStatusFilter(event.target.value as 'ALL' | AccountStatus);
+              }}
+              className='h-11 rounded-xl border border-slate-200 px-3 text-sm'
+            >
+              <option value='ALL'>All account statuses</option>
+              <option value='ACTIVE'>Active</option>
+              <option value='SUSPENDED'>Suspended</option>
+            </select>
           </div>
         </div>
       </section>
 
       {error && (
-        <div className='mt-6 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700'>
-          <AlertCircle className='mt-0.5 h-5 w-5 shrink-0' />
-
+        <div className='mt-6 flex gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700'>
+          <AlertCircle className='h-5 w-5 shrink-0' />
           <div>
             <p className='font-bold'>Unable to load users</p>
-            <p className='mt-1'>{error}</p>
-          </div>
-        </div>
-      )}
-
-      {actionError && (
-        <div className='mt-6 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700'>
-          <AlertCircle className='mt-0.5 h-5 w-5 shrink-0' />
-
-          <div>
-            <p className='font-bold'>User action failed</p>
-            <p className='mt-1'>{actionError}</p>
+            <p>{error}</p>
           </div>
         </div>
       )}
 
       {!hasLoaded ? (
         <div className='grid min-h-96 place-items-center'>
-          <div className='flex items-center gap-2 text-sm font-semibold text-slate-500'>
-            <LoaderCircle className='h-5 w-5 animate-spin' />
-            Loading users...
-          </div>
+          <LoaderCircle className='h-6 w-6 animate-spin text-slate-500' />
         </div>
       ) : users.length === 0 ? (
-        <section className='mt-6 grid min-h-80 place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center'>
-          <div>
+        <section className='mt-6 grid min-h-80 place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50'>
+          <div className='text-center'>
             <Users className='mx-auto h-12 w-12 text-slate-300' />
-
-            <h2 className='mt-4 text-lg font-bold text-slate-800'>
-              No users found
-            </h2>
-
-            <p className='mt-2 max-w-sm text-sm leading-6 text-slate-500'>
-              Try changing the search query or clearing one of the filters.
-            </p>
+            <h2 className='mt-4 text-lg font-bold'>No users found</h2>
           </div>
         </section>
       ) : (
         <section className='mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm'>
           <div className='overflow-x-auto'>
-            <table className='min-w-250 w-full text-left'>
-              <thead className='border-b border-slate-200 bg-slate-50'>
+            <table className='w-full min-w-250 text-left'>
+              <thead className='bg-slate-50 text-xs text-slate-500 uppercase'>
                 <tr>
-                  <th className='px-5 py-4 text-xs font-bold tracking-wide text-slate-500 uppercase'>
-                    User
-                  </th>
-                  <th className='px-5 py-4 text-xs font-bold tracking-wide text-slate-500 uppercase'>
-                    Role
-                  </th>
-                  <th className='px-5 py-4 text-xs font-bold tracking-wide text-slate-500 uppercase'>
-                    Account
-                  </th>
-                  <th className='px-5 py-4 text-xs font-bold tracking-wide text-slate-500 uppercase'>
-                    Joined
-                  </th>
-                  <th className='px-5 py-4 text-right text-xs font-bold tracking-wide text-slate-500 uppercase'>
-                    Actions
-                  </th>
+                  <th className='px-5 py-4'>User</th>
+                  <th className='px-5 py-4'>Role</th>
+                  <th className='px-5 py-4'>Account</th>
+                  <th className='px-5 py-4'>Joined</th>
+                  <th className='px-5 py-4 text-right'>Actions</th>
                 </tr>
               </thead>
 
               <tbody className='divide-y divide-slate-100'>
                 {users.map((user) => {
-                  const roleBadge = getRoleBadge(user.role);
-                  const accountBadge = getAccountStatusBadge(
-                    user.accountStatus
-                  );
+                  const role = roleBadge(user.role);
+                  const status = statusBadge(user.accountStatus);
                   const isPending = pendingActionUserId === user._id;
 
                   return (
-                    <tr
-                      key={user._id}
-                      className='transition hover:bg-slate-50/80'
-                    >
+                    <tr key={user._id}>
                       <td className='px-5 py-4'>
                         <div className='flex items-center gap-3'>
                           {user.image ? (
                             <Image
                               src={user.image}
                               alt={user.name}
-                              className='h-10 w-10 rounded-full border border-slate-200 object-cover'
-                              priority
                               width={40}
                               height={40}
+                              className='h-10 w-10 rounded-full object-cover'
                             />
                           ) : (
-                            <div className='grid h-10 w-10 place-items-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700'>
+                            <div className='grid h-10 w-10 place-items-center rounded-full bg-indigo-100 font-bold text-indigo-700'>
                               {getInitials(user.name)}
                             </div>
                           )}
 
-                          <div className='min-w-0'>
-                            <p className='truncate text-sm font-bold text-slate-800'>
+                          <div>
+                            <p className='font-bold text-slate-800'>
                               {user.name}
                             </p>
-
-                            <p className='mt-0.5 truncate text-xs text-slate-500'>
+                            <p className='text-xs text-slate-500'>
                               {user.email}
                             </p>
                           </div>
@@ -694,77 +506,62 @@ export default function AdminUsersPage() {
 
                       <td className='px-5 py-4'>
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${roleBadge.className}`}
+                          className={`rounded-full px-2.5 py-1 text-xs font-bold ${role.color}`}
                         >
-                          {roleBadge.label}
+                          {role.label}
                         </span>
                       </td>
 
                       <td className='px-5 py-4'>
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${accountBadge.className}`}
+                          className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.color}`}
                         >
-                          {accountBadge.label}
+                          {status.label}
                         </span>
                       </td>
 
-                      <td className='px-5 py-4 text-sm font-medium text-slate-600'>
+                      <td className='px-5 py-4 text-sm text-slate-600'>
                         {formatDate(user.createdAt)}
                       </td>
 
                       <td className='px-5 py-4'>
-                        <div className='flex items-center justify-end gap-2'>
-                          <label className='relative'>
-                            <span className='sr-only'>
-                              Change {user.name}&apos;s role
-                            </span>
-
-                            <select
-                              value={user.role}
-                              disabled={
-                                isPending || Boolean(pendingActionUserId)
-                              }
-                              onChange={(event) =>
-                                void handleRoleChange(
-                                  user,
-                                  event.target.value as UserRole
-                                )
-                              }
-                              className='h-9 appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pr-8 pl-3 text-xs font-bold text-slate-700 outline-none transition hover:bg-slate-50 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60'
-                            >
-                              {roleSelectOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-
-                            <ChevronDown className='pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500' />
-                          </label>
+                        <div className='flex justify-end gap-2'>
+                          <select
+                            value={user.role}
+                            disabled={Boolean(pendingActionUserId)}
+                            onChange={(event) =>
+                              openRoleModal(
+                                user,
+                                event.target.value as UserRole
+                              )
+                            }
+                            className='h-9 rounded-lg border border-slate-200 px-2 text-xs font-bold'
+                          >
+                            <option value='STUDENT'>Student</option>
+                            <option value='INSTRUCTOR'>Instructor</option>
+                            <option value='ADMIN'>Admin</option>
+                          </select>
 
                           <button
                             type='button'
-                            disabled={isPending || Boolean(pendingActionUserId)}
-                            onClick={() => void handleAccountStatusChange(user)}
-                            className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                            disabled={Boolean(pendingActionUserId)}
+                            onClick={() => void changeAccountStatus(user)}
+                            className={`inline-flex h-9 items-center gap-1 rounded-lg px-3 text-xs font-bold text-white ${
                               user.accountStatus === 'ACTIVE'
-                                ? 'bg-rose-600 hover:bg-rose-700'
-                                : 'bg-emerald-600 hover:bg-emerald-700'
+                                ? 'bg-rose-600'
+                                : 'bg-emerald-600'
                             }`}
                           >
                             {isPending ? (
-                              <LoaderCircle className='h-3.5 w-3.5 animate-spin' />
+                              <LoaderCircle className='h-4 w-4 animate-spin' />
                             ) : user.accountStatus === 'ACTIVE' ? (
-                              <Ban className='h-3.5 w-3.5' />
+                              <Ban className='h-4 w-4' />
                             ) : (
-                              <ShieldCheck className='h-3.5 w-3.5' />
+                              <ShieldCheck className='h-4 w-4' />
                             )}
-
-                            {isPending
-                              ? 'Saving'
-                              : user.accountStatus === 'ACTIVE'
-                                ? 'Suspend'
-                                : 'Reactivate'}
+                            {user.accountStatus === 'ACTIVE'
+                              ? 'Suspend'
+                              : 'Reactivate'}
                           </button>
                         </div>
                       </td>
@@ -775,42 +572,31 @@ export default function AdminUsersPage() {
             </table>
           </div>
 
-          <div className='flex flex-col gap-4 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='flex items-center justify-between border-t px-5 py-4'>
             <p className='text-sm text-slate-500'>
-              Showing{' '}
-              <span className='font-semibold text-slate-700'>
-                {(meta.page - 1) * meta.limit + 1}
-              </span>{' '}
-              to{' '}
-              <span className='font-semibold text-slate-700'>
-                {Math.min(meta.page * meta.limit, meta.total)}
-              </span>{' '}
-              of{' '}
-              <span className='font-semibold text-slate-700'>{meta.total}</span>{' '}
-              users
+              Showing {(meta.page - 1) * meta.limit + 1} to{' '}
+              {Math.min(meta.page * meta.limit, meta.total)} of {meta.total}
             </p>
 
             <div className='flex items-center gap-2'>
               <button
                 type='button'
-                onClick={() => goToPage(page - 1)}
                 disabled={page <= 1}
-                className='grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40'
-                aria-label='Previous page'
+                onClick={() => setPage(page - 1)}
+                className='grid h-9 w-9 place-items-center rounded-lg border'
               >
                 <ChevronLeft className='h-4 w-4' />
               </button>
 
-              <span className='min-w-24 text-center text-sm font-semibold text-slate-700'>
+              <span className='text-sm font-semibold'>
                 Page {meta.page} of {meta.totalPages}
               </span>
 
               <button
                 type='button'
-                onClick={() => goToPage(page + 1)}
                 disabled={page >= meta.totalPages}
-                className='grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40'
-                aria-label='Next page'
+                onClick={() => setPage(page + 1)}
+                className='grid h-9 w-9 place-items-center rounded-lg border'
               >
                 <ChevronRight className='h-4 w-4' />
               </button>
@@ -819,14 +605,86 @@ export default function AdminUsersPage() {
         </section>
       )}
 
-      <section className='mt-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900'>
-        <ShieldOff className='mt-0.5 h-5 w-5 shrink-0 text-amber-700' />
-
-        <p className='leading-6'>
+      <section className='mt-6 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900'>
+        <ShieldOff className='h-5 w-5 shrink-0' />
+        <p>
           Suspending an account blocks its access to protected platform APIs.
-          Role changes are privileged actions—confirm each change carefully.
+          Role changes are privileged actions.
         </p>
       </section>
+
+      {roleChangeTarget && (
+        <div
+          className='fixed inset-0 z-9999 flex items-center justify-center bg-slate-950/50 p-4'
+          onClick={closeRoleModal}
+        >
+          <div
+            className='w-full max-w-md rounded-2xl bg-white shadow-2xl'
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className='border-b border-slate-100 px-6 py-5'>
+              <div className='flex gap-3'>
+                <div className='grid h-11 w-11 place-items-center rounded-full bg-amber-100 text-amber-700'>
+                  <AlertTriangle className='h-5 w-5' />
+                </div>
+
+                <div>
+                  <h2 className='text-lg font-bold text-slate-900'>
+                    Change user role?
+                  </h2>
+                  <p className='mt-1 text-sm text-slate-600'>
+                    This will update the user&apos;s platform permissions
+                    immediately.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className='px-6 py-5'>
+              <div className='rounded-xl bg-slate-50 p-4 text-sm text-slate-700'>
+                Change <strong>{roleChangeTarget.user.name}</strong> from{' '}
+                <strong>{roleBadge(roleChangeTarget.user.role).label}</strong>{' '}
+                to <strong>{roleBadge(roleChangeTarget.nextRole).label}</strong>
+                ?
+              </div>
+
+              {actionError && (
+                <div className='mt-4 flex gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-700'>
+                  <AlertCircle className='h-4 w-4 shrink-0' />
+                  <p>{actionError}</p>
+                </div>
+              )}
+            </div>
+
+            <div className='flex justify-end gap-3 border-t border-slate-100 px-6 py-5'>
+              <button
+                type='button'
+                onClick={closeRoleModal}
+                disabled={Boolean(pendingActionUserId)}
+                className='rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700'
+              >
+                Cancel
+              </button>
+
+              <button
+                type='button'
+                onClick={() => void confirmRoleChange()}
+                disabled={Boolean(pendingActionUserId)}
+                className='inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white'
+              >
+                {pendingActionUserId ? (
+                  <>
+                    <LoaderCircle className='h-4 w-4 animate-spin' />
+                    Updating...
+                  </>
+                ) : (
+                  'Confirm role change'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
