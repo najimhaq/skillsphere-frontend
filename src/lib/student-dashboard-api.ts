@@ -18,13 +18,11 @@ export type StudentDashboardOverview = {
   student: {
     name: string;
   };
-
   stats: {
     coursesEnrolled: number;
     lessonsCompleted: number;
     certificatesEarned: number;
   };
-
   continueLearning: StudentDashboardCourse[];
 };
 
@@ -33,6 +31,25 @@ type ApiResponse<T> = {
   message?: string;
   data: T;
 };
+
+type ApiErrorResponse = {
+  success?: false;
+  message?: string;
+};
+
+export type UploadStudentProfileImageResponse = {
+  image: string;
+};
+
+async function getApiError(response: Response): Promise<string> {
+  try {
+    const result = (await response.json()) as ApiErrorResponse;
+
+    return result.message ?? 'Unable to upload profile image.';
+  } catch {
+    return 'Unable to upload profile image.';
+  }
+}
 
 export const getStudentDashboardOverview =
   async (): Promise<StudentDashboardOverview> => {
@@ -51,3 +68,32 @@ export const getStudentDashboardOverview =
 
     return result.data;
   };
+
+export const uploadStudentProfileImage = async (
+  file: File
+): Promise<UploadStudentProfileImageResponse> => {
+  const formData = new FormData();
+
+  formData.append('image', file);
+
+  const response = await fetch(
+    `${API_URL}/api/dashboard/student/profile/image`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(await getApiError(response));
+  }
+
+  const result = (await response.json()) as {
+    success: true;
+    message?: string;
+    data: UploadStudentProfileImageResponse;
+  };
+
+  return result.data;
+};

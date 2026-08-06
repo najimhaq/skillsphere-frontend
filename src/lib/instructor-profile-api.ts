@@ -1,3 +1,4 @@
+//src/lib/instructor-profile-api.ts
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 export type InstructorUser = {
@@ -135,4 +136,4 @@ export async function uploadInstructorProfileImage(
   return result.data;
 }
 
-/* import { FaGithub, FaLinkedin } from 'react-icons/fa'; */
+

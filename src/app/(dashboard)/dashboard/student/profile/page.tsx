@@ -1,20 +1,27 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Award,
   BookOpen,
+  Camera,
   CheckCircle2,
   Edit3,
   GraduationCap,
-  ImageIcon,
   LoaderCircle,
   Mail,
   Save,
   Settings,
   ShieldCheck,
+  Upload,
   X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -22,8 +29,15 @@ import toast from 'react-hot-toast';
 import { authClient } from '@/lib/auth-client';
 import {
   getStudentDashboardOverview,
+  uploadStudentProfileImage,
   type StudentDashboardOverview,
 } from '@/lib/student-dashboard-api';
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+
 
 const getInitials = (name: string) => {
   return (
@@ -36,17 +50,10 @@ const getInitials = (name: string) => {
   );
 };
 
-const isValidImageUrl = (value: string) => {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' || url.protocol === 'http:';
-  } catch {
-    return false;
-  }
-};
-
 export default function StudentProfilePage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const {
     data: session,
     isPending,
@@ -59,9 +66,13 @@ export default function StudentProfilePage() {
   const [isOverviewLoading, setIsOverviewLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const [name, setName] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [localImagePreview, setLocalImagePreview] = useState<string | null>(
+    null
+  );
 
   const user = session?.user;
 
@@ -103,8 +114,16 @@ export default function StudentProfilePage() {
     };
   }, [user]);
 
+  useEffect(() => {
+    return () => {
+      if (localImagePreview) {
+        URL.revokeObjectURL(localImagePreview);
+      }
+    };
+  }, [localImagePreview]);
+
   const displayName = user?.name ?? 'Student';
-  const avatarUrl = user?.image ?? '';
+  const avatarUrl = localImagePreview ?? user?.image ?? '';
   const stats = overview?.stats;
 
   const memberSince = user?.createdAt
@@ -114,10 +133,83 @@ export default function StudentProfilePage() {
       }).format(new Date(user.createdAt))
     : '—';
 
+  const clearSelectedImage = () => {
+    if (localImagePreview) {
+      URL.revokeObjectURL(localImagePreview);
+    }
+
+    setSelectedImage(null);
+    setLocalImagePreview(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const resetEditForm = () => {
     setName(user?.name ?? '');
-    setImageUrl(user?.image ?? '');
+    clearSelectedImage();
     setIsEditing(false);
+  };
+
+  const handleSelectImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!allowedImageTypes.has(file.type)) {
+      toast.error('Please choose a JPEG, PNG, or WebP image.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error('Your profile image must be 5 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    if (localImagePreview) {
+      URL.revokeObjectURL(localImagePreview);
+    }
+
+    setSelectedImage(file);
+    setLocalImagePreview(URL.createObjectURL(file));
+  };
+
+  const uploadSelectedImage = async (): Promise<void> => {
+    
+
+    if (!selectedImage) {
+      toast.error('Please choose an image first.');
+      return;
+    }
+
+    setIsUploadingImage(true);
+
+    try {
+      const result = await uploadStudentProfileImage(selectedImage);
+
+      await refetchSession();
+
+      clearSelectedImage();
+
+      toast.success(
+        result.image
+          ? 'Profile image updated successfully.'
+          : 'Profile image uploaded successfully.'
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Unable to upload profile image.'
+      );
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleProfileSubmit = async (
@@ -126,15 +218,9 @@ export default function StudentProfilePage() {
     event.preventDefault();
 
     const normalizedName = name.trim();
-    const normalizedImageUrl = imageUrl.trim();
 
     if (normalizedName.length < 2) {
       toast.error('Name must contain at least 2 characters.');
-      return;
-    }
-
-    if (normalizedImageUrl && !isValidImageUrl(normalizedImageUrl)) {
-      toast.error('Please enter a valid image URL.');
       return;
     }
 
@@ -143,7 +229,6 @@ export default function StudentProfilePage() {
     try {
       const { error } = await authClient.updateUser({
         name: normalizedName,
-        image: normalizedImageUrl || null,
       });
 
       if (error) {
@@ -153,6 +238,7 @@ export default function StudentProfilePage() {
 
       await refetchSession();
       setIsEditing(false);
+
       toast.success('Profile updated successfully.');
     } catch (error) {
       toast.error(
@@ -234,7 +320,10 @@ export default function StudentProfilePage() {
 
               <button
                 type='button'
-                onClick={() => setIsEditing((value) => !value)}
+                onClick={() => {
+                  setName(user.name ?? '');
+                  setIsEditing((value) => !value);
+                }}
                 className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700'
               >
                 <Edit3 className='h-4 w-4' />
@@ -256,7 +345,7 @@ export default function StudentProfilePage() {
               <h2 className='text-lg font-bold text-slate-900'>Edit profile</h2>
 
               <p className='mt-1 text-sm text-slate-500'>
-                Update your display name and profile image URL.
+                Update your display name and upload a profile image.
               </p>
             </div>
           </div>
@@ -280,48 +369,95 @@ export default function StudentProfilePage() {
                 />
               </label>
 
-              <label className='block'>
-                <span className='text-sm font-semibold text-slate-700'>
-                  Profile image URL
-                </span>
+              <div>
+                <div className='flex flex-col justify-between gap-3 sm:flex-row sm:items-center'>
+                  <div>
+                    <p className='text-sm font-semibold text-slate-700'>
+                      Profile image
+                    </p>
 
-                <input
-                  type='url'
-                  value={imageUrl}
-                  onChange={(event) => setImageUrl(event.target.value)}
-                  placeholder='https://example.com/your-photo.jpg'
-                  inputMode='url'
-                  className='mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100'
-                />
-
-                <span className='mt-1.5 flex items-center gap-1.5 text-xs leading-5 text-slate-500'>
-                  <ImageIcon className='h-3.5 w-3.5' />
-                  Leave blank to use your initials as an avatar.
-                </span>
-              </label>
-
-              {imageUrl.trim() && isValidImageUrl(imageUrl.trim()) && (
-                <div className='flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                  <div className='grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-indigo-100 text-sm font-bold text-indigo-700'>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={imageUrl.trim()}
-                      alt='New profile preview'
-                      className='h-full w-full object-cover'
-                    />
+                    <p className='mt-1 text-xs leading-5 text-slate-500'>
+                      JPEG, PNG, or WebP. Maximum file size: 5 MB.
+                    </p>
                   </div>
 
-                  <p className='text-sm text-slate-600'>
-                    Profile image preview
-                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type='file'
+                    accept='image/jpeg,image/png,image/webp'
+                    onChange={handleSelectImage}
+                    className='hidden'
+                  />
+
+                  <button
+                    type='button'
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                    className='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+                  >
+                    <Camera className='h-4 w-4' />
+                    Choose image
+                  </button>
                 </div>
-              )}
+
+                {selectedImage && (
+                  <div className='mt-4 flex flex-col gap-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4 sm:flex-row sm:items-center sm:justify-between'>
+                    <div className='flex min-w-0 items-center gap-3'>
+                      <div className='h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-indigo-100'>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={localImagePreview ?? ''}
+                          alt='Selected profile image preview'
+                          className='h-full w-full object-cover'
+                        />
+                      </div>
+
+                      <div className='min-w-0'>
+                        <p className='truncate text-sm font-semibold text-indigo-900'>
+                          {selectedImage.name}
+                        </p>
+
+                        <p className='mt-1 text-xs text-indigo-700'>
+                          {(selectedImage.size / 1024 / 1024).toFixed(2)} MB ·
+                          Ready to upload
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className='flex shrink-0 items-center gap-2'>
+                      <button
+                        type='button'
+                        onClick={clearSelectedImage}
+                        disabled={isUploadingImage}
+                        className='inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60'
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type='button'
+                        onClick={() => void uploadSelectedImage()}
+                        disabled={isUploadingImage}
+                        className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
+                      >
+                        {isUploadingImage ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : (
+                          <Upload className='h-4 w-4' />
+                        )}
+
+                        {isUploadingImage ? 'Uploading...' : 'Upload image'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className='mt-6 flex flex-wrap gap-3'>
               <button
                 type='submit'
-                disabled={isSaving}
+                disabled={isSaving || isUploadingImage}
                 className='inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
               >
                 {isSaving ? (
@@ -332,7 +468,7 @@ export default function StudentProfilePage() {
                 ) : (
                   <>
                     <Save className='h-4 w-4' />
-                    Save changes
+                    Save name
                   </>
                 )}
               </button>
@@ -340,7 +476,7 @@ export default function StudentProfilePage() {
               <button
                 type='button'
                 onClick={resetEditForm}
-                disabled={isSaving}
+                disabled={isSaving || isUploadingImage}
                 className='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
               >
                 <X className='h-4 w-4' />
